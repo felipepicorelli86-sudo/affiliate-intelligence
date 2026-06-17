@@ -225,7 +225,6 @@
   <div class="logo"><h1>Affiliate Hub</h1><p>Multi-network dashboard</p></div>
   <div class="nav-section">Visao Geral</div>
   <div class="nav-item active" onclick="showSection('performance',this)">Dashboard</div>
-  <div class="nav-item" onclick="showSection('market',this)">Mercado Publico</div>
   <div class="nav-section">Redes de Afiliados</div>
   <div class="networks-list" id="networksList"></div>
   <button class="add-net-btn" onclick="openModal()">+ Adicionar rede</button>
@@ -332,95 +331,6 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════ MARKET SECTION ═══════════════════════════════ -->
-  <div id="sec-market" class="section">
-    <div class="topbar">
-      <div><h2>Mercado Publico</h2><div class="subtitle">Ofertas em alta, Clickbank gravity, tendencias Google</div></div>
-      <button class="toolbar-btn" onclick="loadMarketData()">Atualizar dados</button>
-    </div>
-
-    <div class="info-banner">
-      <strong>Dados publicos sem login</strong> &mdash; OfferVault agrega 200+ redes &middot; Clickbank gravity via CBEngine &middot; Google Trends por nicho de saude. Cache de 2h.
-    </div>
-
-    <div class="mkt-stat-grid">
-      <div class="mkt-stat"><div class="mkt-stat-label">Ofertas OfferVault</div><div class="mkt-stat-value" id="mktStatOffers">--</div><div class="mkt-stat-sub">saude &amp; bem-estar</div></div>
-      <div class="mkt-stat"><div class="mkt-stat-label">Produtos Clickbank</div><div class="mkt-stat-value" id="mktStatCB">--</div><div class="mkt-stat-sub">por gravity score</div></div>
-      <div class="mkt-stat"><div class="mkt-stat-label">Maior Gravity CB</div><div class="mkt-stat-value" id="mktStatGravity">--</div><div class="mkt-stat-sub">top produto</div></div>
-      <div class="mkt-stat"><div class="mkt-stat-label">Pais #1 Tendencia</div><div class="mkt-stat-value" id="mktStatCountry">--</div><div class="mkt-stat-sub">weight loss interest</div></div>
-    </div>
-
-    <div class="market-tabs">
-      <button class="mkt-tab active" onclick="showMktPanel('clickbank',this)">Clickbank Top Products</button>
-      <button class="mkt-tab" onclick="showMktPanel('offervault',this)">OfferVault Offers</button>
-      <button class="mkt-tab" onclick="showMktPanel('trends',this)">Google Trends</button>
-      <button class="mkt-tab" onclick="showMktPanel('countries',this)">Interesse por Pais</button>
-    </div>
-
-    <!-- Clickbank Panel -->
-    <div id="mkt-clickbank" class="mkt-panel visible">
-      <div class="table-card" style="margin-bottom:0">
-        <div class="table-header">
-          <div><div class="chart-title">Top Produtos Clickbank</div><div class="chart-subtitle">Ordenados por Gravity Score (via CBEngine)</div></div>
-          <input class="search-input" placeholder="Buscar produto..." oninput="filterMktTable('cb',this.value)">
-        </div>
-        <div id="cbLoading" class="loading-state">Carregando dados do Clickbank...</div>
-        <table id="cbTable" style="display:none">
-          <thead><tr><th>#</th><th>Produto</th><th>Gravity</th><th>Comissao Inicial</th><th>Comissao Media</th><th>Categoria</th></tr></thead>
-          <tbody id="cbBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- OfferVault Panel -->
-    <div id="mkt-offervault" class="mkt-panel">
-      <div class="table-card" style="margin-bottom:0">
-        <div class="table-header">
-          <div><div class="chart-title">Ofertas OfferVault</div><div class="chart-subtitle">200+ redes de afiliados agregadas em tempo real</div></div>
-          <input class="search-input" placeholder="Buscar oferta..." oninput="filterMktTable('ov',this.value)">
-        </div>
-        <div id="ovLoading" class="loading-state">Carregando OfferVault...</div>
-        <table id="ovTable" style="display:none">
-          <thead><tr><th>#</th><th>Oferta</th><th>Rede</th><th>Payout</th><th>GEOs</th><th>Tipo</th><th>Categoria</th></tr></thead>
-          <tbody id="ovBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Trends Panel -->
-    <div id="mkt-trends" class="mkt-panel">
-      <div class="charts-grid">
-        <div class="chart-card">
-          <div class="chart-title">Interesse ao longo do tempo</div>
-          <div class="chart-subtitle">Ultimos 3 meses - escala 0-100</div>
-          <div style="position:relative;height:220px"><canvas id="trendsChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Intensidade Atual por Nicho</div>
-          <div class="chart-subtitle">Ultimo ponto disponivel do Google Trends</div>
-          <div id="trendsBars" style="padding-top:8px"><div class="loading-state">Carregando Trends...</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Countries Panel -->
-    <div id="mkt-countries" class="mkt-panel">
-      <div class="bottom-grid">
-        <div class="chart-card">
-          <div class="chart-title">Top Paises - Interesse em Weight Loss</div>
-          <div class="chart-subtitle">Indice de busca relativo (Google Trends)</div>
-          <div id="countriesList"><div class="loading-state">Carregando paises...</div></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Distribuicao por Regiao</div>
-          <div class="chart-subtitle">% de interesse global</div>
-          <div style="position:relative;height:260px"><canvas id="countriesPie"></canvas></div>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- end sec-market -->
-
   <!-- ═══════════════════════════════════ NETWORK DETAIL SECTION ═══════════════════════════ -->
   <div id="sec-network" class="section">
     <div class="topbar">
@@ -433,7 +343,7 @@
 
     <div class="kpi-grid" style="margin-bottom:24px">
       <div class="kpi-card k1">
-        <div class="kpi-label">Receita (demo)</div>
+        <div class="kpi-label" id="net-rev-label">Receita</div>
         <div class="kpi-value" id="net-stat-rev">--</div>
       </div>
       <div class="kpi-card k2">
@@ -456,7 +366,7 @@
 
     <div class="table-card">
       <div class="table-header">
-        <div><div class="chart-title" id="net-table-title">Produtos desta rede</div><div class="chart-subtitle">Dados de demonstracao</div></div>
+        <div><div class="chart-title" id="net-table-title">Produtos desta rede</div><div class="chart-subtitle" id="net-table-sub">Configure a API para ver dados reais</div></div>
       </div>
       <table>
         <thead><tr><th>#</th><th>Produto</th><th>Pais Top</th><th>CPC</th><th>Conversoes</th><th>Comissao</th><th>ROI</th><th>Status</th></tr></thead>
@@ -567,7 +477,7 @@ function showMktPanel(id, btn) {
   btn.classList.add('active');
 }
 
-const API_BASE = 'https://web-production-07822.up.railway.app';
+const API_BASE = 'https://affiliate-intelligence.up.railway.app';
 
 async function loadMarketData() {
   // Load all market data in parallel
@@ -814,16 +724,18 @@ function selectNetwork(el, idx){
   badge.className = 'net-badge ' + (n.status === 'active' ? 'badge-green' : 'badge-orange');
   badge.style = 'font-size:14px;padding:6px 16px';
   // KPIs
-  document.getElementById('net-stat-rev').textContent = '$' + n.rev.toLocaleString();
-  document.getElementById('net-stat-roi').textContent = n.roi + '%';
-  const prods = DEMO_PRODUCTS.filter(p => p.net.toLowerCase() === n.name.toLowerCase());
-  document.getElementById('net-stat-prods').textContent = prods.length || '—';
   const apiKey = n.name.toLowerCase().replace(/ /g,'_');
   const apiOk = window._netStatus && window._netStatus[apiKey];
+  document.getElementById('net-stat-rev').textContent = apiOk ? ('$' + n.rev.toLocaleString()) : '—';
+  document.getElementById('net-stat-roi').textContent = apiOk ? (n.roi + '%') : '—';
+  const prods = DEMO_PRODUCTS.filter(p => p.net.toLowerCase() === n.name.toLowerCase());
+  document.getElementById('net-stat-prods').textContent = prods.length || '—';
+  document.getElementById('net-rev-label').textContent = apiOk ? 'Receita' : 'Receita (sem API)';
   document.getElementById('net-stat-api').textContent = apiOk ? '✅ Sim' : '❌ Nao';
   document.getElementById('net-api-banner').style.display = apiOk ? 'none' : 'block';
   // Products table
   document.getElementById('net-table-title').textContent = 'Produtos de ' + n.name;
+  document.getElementById('net-table-sub').textContent = apiOk ? 'Dados da API' : 'Configure a API para ver dados reais';
   const maxC = prods.length ? Math.max(...prods.map(p=>p.comm)) : 1;
   const tbody = document.getElementById('net-detail-products');
   const empty = document.getElementById('net-detail-empty');
