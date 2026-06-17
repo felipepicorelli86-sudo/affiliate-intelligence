@@ -413,6 +413,51 @@
 
   </div><!-- end sec-market -->
 
+  <!-- ═══════════════════════════════════ NETWORK DETAIL SECTION ═══════════════════════════ -->
+  <div id="sec-network" class="section">
+    <div class="topbar">
+      <div>
+        <h2 id="net-detail-title">Rede</h2>
+        <div class="subtitle" id="net-detail-sub">Dados da rede selecionada</div>
+      </div>
+      <span id="net-detail-badge" class="net-badge" style="font-size:14px;padding:6px 16px"></span>
+    </div>
+
+    <div class="kpi-grid" style="margin-bottom:24px">
+      <div class="kpi-card k1">
+        <div class="kpi-label">Receita (demo)</div>
+        <div class="kpi-value" id="net-stat-rev">--</div>
+      </div>
+      <div class="kpi-card k2">
+        <div class="kpi-label">ROI medio</div>
+        <div class="kpi-value" id="net-stat-roi">--</div>
+      </div>
+      <div class="kpi-card k3">
+        <div class="kpi-label">Produtos ativos</div>
+        <div class="kpi-value" id="net-stat-prods">--</div>
+      </div>
+      <div class="kpi-card k4">
+        <div class="kpi-label">API configurada</div>
+        <div class="kpi-value" id="net-stat-api">--</div>
+      </div>
+    </div>
+
+    <div class="info-banner" id="net-api-banner" style="display:none">
+      <strong>API nao configurada</strong> &mdash; Para ver dados reais desta rede, adicione as credenciais nas variaveis do Railway → Variables.
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <div><div class="chart-title" id="net-table-title">Produtos desta rede</div><div class="chart-subtitle">Dados de demonstracao</div></div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Produto</th><th>Pais Top</th><th>CPC</th><th>Conversoes</th><th>Comissao</th><th>ROI</th><th>Status</th></tr></thead>
+        <tbody id="net-detail-products"></tbody>
+      </table>
+      <div id="net-detail-empty" class="loading-state" style="display:none">Nenhum produto encontrado para esta rede nos dados de demonstracao.</div>
+    </div>
+  </div><!-- end sec-network -->
+
 </main>
 
 <div class="modal-bg" id="modalBg">
@@ -740,7 +785,7 @@ function renderLeaderboards(vendors,products,geos){
 
 function renderNetworks(){
   document.getElementById('networksList').innerHTML=NETWORKS.map((n,i)=>`
-    <div class="network-item ${i===0?'active-net':''}" onclick="selectNetwork(this)">
+    <div class="network-item ${i===0?'active-net':''}" onclick="selectNetwork(this,${i})">
       <div class="net-left">
         <div class="net-icon" style="background:${n.color}22;color:${n.color}">${n.icon}</div>
         <div class="net-name">${n.name}</div>
@@ -748,7 +793,51 @@ function renderNetworks(){
       <span class="net-badge ${n.status==='active'?'badge-green':'badge-orange'}">${n.status==='active'?'ON':'OFF'}</span>
     </div>`).join('');
 }
-function selectNetwork(el){document.querySelectorAll('.network-item').forEach(e=>e.classList.remove('active-net'));el.classList.add('active-net');}
+function selectNetwork(el, idx){
+  document.querySelectorAll('.network-item').forEach(e=>e.classList.remove('active-net'));
+  el.classList.add('active-net');
+  const n = NETWORKS[idx];
+  if(!n) return;
+  // Populate header
+  document.getElementById('net-detail-title').textContent = n.name;
+  document.getElementById('net-detail-sub').textContent = 'Dados da rede ' + n.name;
+  const badge = document.getElementById('net-detail-badge');
+  badge.textContent = n.status === 'active' ? 'ATIVO' : 'PAUSADO';
+  badge.className = 'net-badge ' + (n.status === 'active' ? 'badge-green' : 'badge-orange');
+  badge.style = 'font-size:14px;padding:6px 16px';
+  // KPIs
+  document.getElementById('net-stat-rev').textContent = '$' + n.rev.toLocaleString();
+  document.getElementById('net-stat-roi').textContent = n.roi + '%';
+  const prods = DEMO_PRODUCTS.filter(p => p.net.toLowerCase() === n.name.toLowerCase());
+  document.getElementById('net-stat-prods').textContent = prods.length || '—';
+  const apiKey = n.name.toLowerCase().replace(/ /g,'_');
+  const apiOk = window._netStatus && window._netStatus[apiKey];
+  document.getElementById('net-stat-api').textContent = apiOk ? '✅ Sim' : '❌ Nao';
+  document.getElementById('net-api-banner').style.display = apiOk ? 'none' : 'block';
+  // Products table
+  document.getElementById('net-table-title').textContent = 'Produtos de ' + n.name;
+  const maxC = prods.length ? Math.max(...prods.map(p=>p.comm)) : 1;
+  const tbody = document.getElementById('net-detail-products');
+  const empty = document.getElementById('net-detail-empty');
+  if(prods.length === 0){
+    tbody.innerHTML=''; empty.style.display='block';
+  } else {
+    empty.style.display='none';
+    tbody.innerHTML = prods.map((p,i)=>{
+      const bw=Math.round((p.comm/maxC)*80);
+      const tag=p.status==='hot'?'<span class="tag tag-green">Hot</span>':p.status==='scaling'?'<span class="tag tag-purple">Scaling</span>':'<span class="tag tag-orange">Stable</span>';
+      return `<tr><td class="rank">${i+1}</td><td><div class="product-name">${p.name}</div></td>
+        <td>${p.country}</td><td>$${Number(p.cpc).toFixed(2)}</td>
+        <td>${Number(p.conv).toLocaleString()}</td>
+        <td><div class="bar-wrap"><div class="mini-bar" style="width:${bw}px"></div><span>$${Number(p.comm).toLocaleString()}</span></div></td>
+        <td style="color:var(--green);font-weight:600">${p.roi}%</td><td>${tag}</td></tr>`;
+    }).join('');
+  }
+  // Switch section
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('visible'));
+  document.querySelectorAll('.nav-item').forEach(ni=>ni.classList.remove('active'));
+  document.getElementById('sec-network').classList.add('visible');
+}
 
 function renderProducts(data){
   currentProducts=data;
@@ -897,7 +986,7 @@ async function loadFromBackend(days=30,fromDate=null,toDate=null){
     const all=await(await fetch(url)).json();
     showBanner('ok',status.networks,all.summary);
     if(all.summary){document.getElementById('kpiComm').textContent='$'+Number(all.summary.totalCommission).toLocaleString('en-US',{maximumFractionDigits:0});document.getElementById('kpiConv').textContent=Number(all.summary.totalConversions).toLocaleString();}
-    if(status.networks){NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
+    if(status.networks){window._netStatus=status.networks;NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
     if(all.topProducts?.length){renderAndCheck(all.topProducts.map(p=>({name:p.name,net:p.network,country:'Global',cpc:0,conv:p.conversions,comm:p.commission,roi:0,status:p.commission>2000?'hot':p.commission>500?'scaling':'stable'})));}
     if(all.networks){const real=all.networks.filter(n=>n.status==='ok'&&n.data).map(n=>({name:n.source,color:NETWORKS.find(x=>x.name.toLowerCase()===n.source.toLowerCase())?.color||'#6c63ff',rev:parseFloat(n.data.totalCommission)||0}));if(real.length)renderNetworkCompare(real);}
   }catch{showBanner('demo');}
