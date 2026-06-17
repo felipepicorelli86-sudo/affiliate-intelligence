@@ -295,9 +295,17 @@ app.get('/api/market/audit', async (req, res) => {
     // MediaScalers — 26 ofertas reais com payout real
     if (network === 'all' || network === 'mediascalers') {
       const msResult = publicData.getMediaScalersOffers();
+      const catLower = category.toLowerCase();
+      const msKwMap  = { 'weight loss': ['diet','weight','keto','slim'], 'blood sugar': ['sugar','gluco','diab','blood'], 'joint': ['joint','pain','flex','knee'] };
+      const msKws    = msKwMap[catLower] || [];
       (msResult.offers || []).forEach(p => {
         const name = p.name || p.title;
         if (!name) return;
+        // Se há filtro de categoria, manter só as ofertas relevantes
+        if (msKws.length > 0) {
+          const match = msKws.some(k => name.toLowerCase().includes(k) || (p.category || '').toLowerCase().includes(k));
+          if (!match) return;
+        }
         const comm = parseFloat(p.payout || p.commission || 0);
         products.push({
           name,
