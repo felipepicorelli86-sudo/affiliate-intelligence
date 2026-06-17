@@ -451,6 +451,11 @@ app.get('/api/market/network/:name', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/market/mediascalers — ofertas MediaScalers (aprovadas + marketplace)
+app.get('/api/market/mediascalers', (req, res) => {
+  res.json(publicData.getMediaScalersOffers());
+});
+
 app.listen(PORT, () => {
   console.log(`[Affiliate Hub] Servidor rodando na porta ${PORT}`);
   console.log('[Affiliate Hub] Endpoints:');

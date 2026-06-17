@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PUBLIC DATA MODULE — Affiliate Hub
  * ════════════════════════════════════
  * Coleta dados públicos de:
@@ -252,6 +252,60 @@ async function getTrendsByCountry(keyword = 'weight loss supplement') {
 }
 
 // ══════════════════════════════════════════════════════════════
+// 4b. MEDIASCALERS — ofertas disponíveis (atualizado manualmente)
+//     Fonte: admin.mediascalers.com/offers — Partner ID 6402
+// ══════════════════════════════════════════════════════════════
+const MEDIASCALERS_OFFERS = [
+  { id:4399, name:'Hume Band 2.0', countries:'US,DE,CA,AU,UK,FR,ZA', category:'Health & Wellness', payout:60, added:'2026-06-12' },
+  { id:4398, name:'Bryt Better Coffee Subscription CTC $23.49', countries:'US,DE,CA,AU,UK,FR,IL', category:'Health & Wellness', payout:45, added:'2026-06-12' },
+  { id:4397, name:'Bryt Better Coffee CTC $25.99', countries:'US,DE,CA,AU,UK,FR,IL', category:'Health & Wellness', payout:25, added:'2026-06-12' },
+  { id:4396, name:'KetoNex Gummies DTC', countries:'US', category:'Diet & Weight Loss', payout:145, added:'2026-06-12' },
+  { id:4318, name:'Big EDs Meds - Erectile Dysfunction', countries:'US', category:'Mens Health', payout:125, added:'2026-06-10' },
+  { id:4316, name:'AERIOQ Home AC CTC $134.95', countries:'US', category:'Gadgets & Devices', payout:90, added:'2026-06-10' },
+  { id:4312, name:'AirZa CTC $59.95', countries:'US', category:'Health & Wellness', payout:45, added:'2026-06-10' },
+  { id:4320, name:'Vanotium Cutting Board', countries:'US,DE,CA,AU,GB,FR,NZ', category:'Home Goods', payout:46, added:'2026-06-10' },
+  { id:4319, name:'Melara Max Memory Foam Pillow', countries:'US,DE,CA,AU,GB,FR,NZ', category:'Home Goods', payout:46, added:'2026-06-10' },
+  { id:4299, name:'GrillWizz Grill Cleaner CTC $79.99', countries:'US,DE,CA,AU,UK,FR,IL', category:'Home Goods', payout:55, added:'2026-06-04' },
+  { id:4298, name:'WellaWhite Teeth Whitening Foam CTC $34.99', countries:'US,DE,CA,AU,UK,FR,IL', category:'Beauty', payout:45, added:'2026-06-04' },
+  { id:4249, name:'Arthryon Heat Relief Cream DTC', countries:'US', category:'General Health', payout:145, added:'2026-06-04' },
+  { id:4248, name:'CardioX Glucose Management DTC', countries:'US', category:'General Health', payout:145, added:'2026-06-04' },
+  { id:4247, name:'Element Organics Hemp Gummies', countries:'IL', category:'CBD', payout:125, added:'2026-06-04' },
+  { id:4245, name:'ParaMD Parasite Cleanse', countries:'PR', category:'General Health', payout:125, added:'2026-06-04' },
+  { id:4243, name:'ParaMD Parasite Cleanse AU', countries:'AU', category:'General Health', payout:125, added:'2026-06-04' },
+  { id:4242, name:'Arthryon Heat Relief Cream NZ', countries:'NZ', category:'General Health', payout:125, added:'2026-06-04' },
+  { id:4241, name:'Arthryon Heat Relief Cream AU', countries:'AU', category:'General Health', payout:125, added:'2026-06-04' },
+  { id:4235, name:'KetoNex Gummies AU', countries:'AU', category:'Diet & Weight Loss', payout:125, added:'2026-06-04' },
+  { id:4311, name:'Ozem+ Diet NL', countries:'NL', category:'Diet & Weight Loss', payout:65, added:'2026-06-05' },
+  { id:4264, name:'Hello40 Checkout', countries:'DE,GB,FR,AT,CH,IT,SE', category:'General Health', payout:60, added:'2026-06-04' },
+  { id:4251, name:'Veluna GLP-1 Booster SE', countries:'SE', category:'Diet & Weight Loss', payout:60, added:'2026-06-04' },
+  { id:4250, name:'Veluna GLP-1 Booster DE', countries:'DE', category:'Diet & Weight Loss', payout:60, added:'2026-06-04' },
+  { id:4253, name:'Glucotex DE', countries:'DE', category:'General Health', payout:60, added:'2026-06-04' },
+  { id:4281, name:'Purotyn DE', countries:'DE', category:'Diet & Weight Loss', payout:60, added:'2026-06-04' },
+  { id:4240, name:'RagnarX Gummies French DTC', countries:'FR', category:'Mens Health', payout:125, added:'2026-06-04' },
+];
+
+// Ofertas onde o afiliado está APROVADO (rastrear via postback)
+const MEDIASCALERS_APPROVED = [
+  { id: 2189, name: 'Hume Body Pod', countries: 'US,DE,CA,AU,GB,FR,ZA', category: 'Health & Wellness', payout: 60 },
+  { id: 3306, name: 'FizzClean Toilet Cleaning Foam', countries: 'US,DE,CA,AU,UK,FR,IL', category: 'Home Goods', payout: 56 },
+  { id: 3489, name: 'Glpura - Diet', countries: 'DE,AT,CH', category: 'Diet & Weight Loss', payout: 60 },
+];
+
+function getMediaScalersOffers(limit = 50) {
+  const sorted = [...MEDIASCALERS_OFFERS].sort((a, b) => b.payout - a.payout).slice(0, limit);
+  return {
+    network: 'MediaScalers',
+    approved: MEDIASCALERS_APPROVED,
+    offers: sorted,
+    total: MEDIASCALERS_OFFERS.length,
+    topPayout: Math.max(...MEDIASCALERS_OFFERS.map(o => o.payout)),
+    avgPayout: Math.round(MEDIASCALERS_OFFERS.reduce((s, o) => s + o.payout, 0) / MEDIASCALERS_OFFERS.length),
+    updatedAt: '2026-06-17',
+    postbackUrl: 'https://affiliate-intelligence.up.railway.app/api/postback?network=mediascalers&amount={payout}&conv={transaction_id}&offer={offer_name}&offer_id={offer_id}',
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
 // 5. BUYGOODS MARKETPLACE — ofertas públicas sem login
 //    URL: https://www.buygoods.com/marketplace
 // ══════════════════════════════════════════════════════════════
@@ -361,4 +415,4 @@ async function getAllPublicData() {
   return result;
 }
 
-module.exports = { getOfferVaultOffers, getClickbankTopProducts, getGoogleTrends, getTrendsByCountry, getAllPublicData, getBuygoodsMarketplace, getOffersByNetwork };
+module.exports = { getOfferVaultOffers, getClickbankTopProducts, getGoogleTrends, getTrendsByCountry, getAllPublicData, getBuygoodsMarketplace, getOffersByNetwork, getMediaScalersOffers };
