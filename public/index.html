@@ -808,7 +808,7 @@ function selectNetwork(el, idx){
 
 function renderProducts(data){
   currentProducts=data;
-  const maxC=Math.max(...data.map(p=>p.comm));
+  const maxC=Math.max(...data.map(p=>p.comm),1);
   document.getElementById('productsBody').innerHTML=data.map((p,i)=>{
     const bw=Math.round((p.comm/maxC)*80);
     const tag=p.status==='hot'?'<span class="tag tag-green">Hot</span>':p.status==='scaling'?'<span class="tag tag-purple">Scaling</span>':'<span class="tag tag-orange">Stable</span>';
@@ -1028,62 +1028,124 @@ function showBanner(type,networks,summary,period){
   }
 }
 
-// -- MARKET FALLBACK - dados publicos de mercado como referencia --
+// -- DADOS DE MERCADO DAS PLATAFORMAS (publico, sem login) --
 function _parseComm(str){ const n=parseFloat(String(str||'').replace(/[^0-9.]/g,'')); return isNaN(n)?0:n; }
 let _marketFallbackLoaded=false;
+
 async function loadMarketFallback(){
   if(_marketFallbackLoaded)return;
   try{
-    const res=await fetch(`${API_BASE}/api/market/clickbank?category=health&limit=20`,{signal:AbortSignal.timeout(15000)});
-    const data=await res.json();
-    const prods=(data.products||[]).map(p=>({
-      name:p.name,
-      net:'Mercado (Ref.)',
-      country:'USA',
-      cpc:0,
-      conv:Math.round(p.gravity||0),
-      comm:_parseComm(p.initComm)||_parseComm(p.avgComm)||0,
-      roi:0,
-      status:p.gravity>200?'hot':p.gravity>80?'scaling':'stable'
-    }));
+    // Busca dados publicos de Clickbank e Buygoods em paralelo
+    const [cbRes,bgRes]=await Promise.allSettled([
+      fetch(`${API_BASE}/api/market/clickbank?category=health&limit=30`,{signal:AbortSignal.timeout(15000)}),
+      fetch(`${API_BASE}/api/market/buygoods?limit=30`,{signal:AbortSignal.timeout(15000)}),
+    ]);
+
+    let prods=[];
+
+    // Clickbank public — gravity score como proxy de popularidade
+    if(cbRes.status==='fulfilled'){
+      const cbData=await cbRes.value.json();
+      const cbProds=(cbData.products||[]).map(p=>({
+        name:p.name,
+        net:'Clickbank',
+        country:'USA',
+        cpc:0,
+        conv:Math.round(p.gravity||0),
+        comm:_parseComm(p.initComm)||_parseComm(p.avgComm)||0,
+        roi:0,
+        status:p.gravity>200?'hot':p.gravity>80?'scaling':'stable',
+        _vendor:p.vendor||'',
+        _gravity:p.gravity||0,
+      }));
+      prods=prods.concat(cbProds);
+    }
+
+    // Buygoods marketplace public
+    if(bgRes.status==='fulfilled'){
+      const bgData=await bgRes.value.json();
+      const bgProds=(bgData.products||bgData.offers||[]).map(p=>({
+        name:p.name||p.title||p.product_name,
+        net:'Buygoods',
+        country:'USA',
+        cpc:0,
+        conv:parseInt(p.sales_count||p.conversions||0),
+        comm:_parseComm(p.payout||p.commission||p.price||0),
+        roi:0,
+        status:(p.badge||'').toLowerCase().includes('bestsell')?'hot':(p.badge||'').toLowerCase().includes('new')?'scaling':'stable',
+        _gravity:0,
+      }));
+      prods=prods.concat(bgProds);
+    }
+
+    // Filtra registros sem nome e ordena por comissao depois gravity
+    prods=prods.filter(p=>p.name&&p.name.length>1).sort((a,b)=>(b.comm-a.comm)||((b._gravity||0)-(a._gravity||0)));
+
     if(!prods.length){return;}
     _marketFallbackLoaded=true;
     renderAndCheck(prods);
-    // Leaderboard de produtos por gravity
-    const maxConv=Math.max(...prods.map(p=>p.conv),1);
-    document.getElementById('lbProducts').innerHTML=prods.slice(0,5).map((p,i)=>`
+
+    // Leaderboard de produtos por gravidade/popularidade
+    const top5=prods.slice(0,5);
+    const maxScore=Math.max(...top5.map(p=>p.comm||p.conv),1);
+    document.getElementById('lbProducts').innerHTML=top5.map((p,i)=>`
       <div class="lb-row">
         <div class="lb-pos ${posClass(i)}">${i+1}</div>
         <div class="lb-info">
           <div class="lb-name">${p.name}</div>
-          <div class="lb-detail">Gravity ${p.conv} &middot; Ref. mercado</div>
-          <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((p.conv/maxConv)*100)}%"></div></div>
+          <div class="lb-detail">${p.net}${p._vendor?' &middot; '+p._vendor:''}${p.conv?' &middot; Gravity '+p.conv:''}</div>
+          <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round(((p.comm||p.conv)/maxScore)*100)}%;background:${NETWORKS.find(n=>n.name===p.net)?.color||'var(--accent)'}"></div></div>
         </div>
-        <div class="lb-value">${p.conv}<span class="lb-change">gravity</span></div>
+        <div class="lb-value">${p.comm?'$'+p.comm.toFixed(0):p.conv}<span class="lb-change">${p.comm?'por conversao':'gravity'}</span></div>
       </div>`).join('');
-    // KPIs: mostra referencia de mercado
-    const el=document.getElementById('kpiComm');
-    if(el&&el.textContent==='—'){el.textContent='—';}
+
+    // Leaderboard de vendedores (top vendors do Clickbank)
+    const vendors=prods.filter(p=>p._vendor).slice(0,5);
+    if(vendors.length){
+      const maxV=Math.max(...vendors.map(v=>v.comm),1);
+      document.getElementById('lbVendors').innerHTML=vendors.map((v,i)=>`
+        <div class="lb-row">
+          <div class="lb-pos ${posClass(i)}">${i+1}</div>
+          <div class="lb-avatar" style="background:${NETWORKS.find(n=>n.name===v.net)?.color||'var(--accent)'}22;color:${NETWORKS.find(n=>n.name===v.net)?.color||'var(--accent)'}">${v._vendor.slice(0,2).toUpperCase()}</div>
+          <div class="lb-info">
+            <div class="lb-name">${v._vendor}</div>
+            <div class="lb-detail">${v.name} &middot; ${v.net}</div>
+            <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((v.comm/maxV)*100)}%;background:${NETWORKS.find(n=>n.name===v.net)?.color||'var(--accent)'}"></div></div>
+          </div>
+          <div class="lb-value">$${v.comm.toFixed(0)}<span class="lb-change">por conv.</span></div>
+        </div>`).join('');
+    }
+
+    // KPIs: atualiza textos de carregando
     const cc=document.getElementById('kpiCommChange');
     if(cc&&cc.textContent==='Carregando...')cc.textContent='Sem vendas no periodo';
-    const vc=document.getElementById('kpiConv');
-    if(vc&&vc.textContent==='—'){vc.textContent='0';}
     const vcc=document.getElementById('kpiConvChange');
     if(vcc&&vcc.textContent==='Carregando...')vcc.textContent='Sem conversoes no periodo';
     const cpcc=document.getElementById('kpiCpcChange');
     if(cpcc&&cpcc.textContent==='Carregando...')cpcc.textContent='Sem dados de CPC';
+    const kpiComm=document.getElementById('kpiComm');
+    if(kpiComm&&kpiComm.textContent==='—')kpiComm.textContent='$0';
+    const kpiConv=document.getElementById('kpiConv');
+    if(kpiConv&&kpiConv.textContent==='—')kpiConv.textContent='0';
+
     // Banner informativo
-    const b=document.getElementById('connBanner');
-    if(b)b.innerHTML+=' &middot; <span style="color:#a78bfa">Tabela exibe referencia de mercado (Clickbank publico)</span>';
-    else{
+    const existing=document.getElementById('connBanner');
+    if(existing){
+      existing.innerHTML+=' &middot; <span style="color:#a78bfa">Tabela: top produtos da plataforma (mercado publico)</span>';
+    }else{
       const nb=document.createElement('div');
       nb.id='connBanner';
       nb.style.cssText='background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#a78bfa;display:flex;align-items:center;gap:8px';
-      nb.innerHTML='Referencia de mercado &mdash; Nenhuma venda registrada no periodo. A tabela exibe top produtos do Clickbank publico como inspiracao.';
+      nb.innerHTML='<strong>Referencia de Mercado</strong> &mdash; Sem vendas no periodo selecionado. Exibindo top produtos publicos de Clickbank e Buygoods como inspiracao.';
       document.querySelector('.topbar').after(nb);
     }
   }catch(e){
-    ['kpiCommChange','kpiConvChange','kpiCpcChange'].forEach(id=>{const el=document.getElementById(id);if(el&&el.textContent==='Carregando...')el.textContent='—';});
+    ['kpiCommChange','kpiConvChange','kpiCpcChange'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el&&el.textContent==='Carregando...')el.textContent='—';
+    });
+    const kpiComm=document.getElementById('kpiComm');if(kpiComm&&kpiComm.textContent==='—')kpiComm.textContent='$0';
+    const kpiConv=document.getElementById('kpiConv');if(kpiConv&&kpiConv.textContent==='—')kpiConv.textContent='0';
   }
 }
 
