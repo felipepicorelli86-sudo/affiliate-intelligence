@@ -104,42 +104,53 @@ async function fetchClickbank(days = 30, from = null, to = null) {
 
 // ═══════════════════════════════════════════════════════════════
 // ── BUYGOODS ───────────────────────────────────────────────────
-// Auth: API Key no header X-API-Key
-// Docs: disponível no dashboard → Settings → API
+// Usa ClickCRM (mesmo do Maxweb) + endpoint próprio de comissões
+// Auth: account_id=BUYGOODS_AFFILIATE_ID & token=BUYGOODS_API_KEY
 // ═══════════════════════════════════════════════════════════════
 async function fetchBuygoods(days = 30, from = null, to = null) {
-  if (!isConfigured('BUYGOODS_API_KEY')) {
+  if (!isConfigured('BUYGOODS_API_KEY', 'BUYGOODS_AFFILIATE_ID')) {
     return { source: 'buygoods', status: 'no_credentials', data: null };
   }
 
   const dates = resolveDates(days, from, to);
-  try {
-    const res = await axios.get('https://api.buygoods.com/v1/affiliate/stats', {
-      headers: {
-        'X-API-Key': process.env.BUYGOODS_API_KEY,
-        Accept: 'application/json',
-      },
-      params: {
-        affiliate_id: process.env.BUYGOODS_AFFILIATE_ID,
-        date_from: dates.from,
-        date_to: dates.to,
-      },
-    });
+  const token = process.env.BUYGOODS_API_KEY;
+  const accountId = process.env.BUYGOODS_AFFILIATE_ID;
 
-    const d = res.data;
+  try {
+    // Busca vendas por dia (ClickCRM) + produtos (Buygoods API) em paralelo
+    const [bydayRes, productsRes] = await Promise.allSettled([
+      axios.get('https://api.clickcrm.com/affiliates/v1/byday', {
+        params: { a: accountId, token, date_from: dates.from, date_to: dates.to, response_type: 'json' },
+        timeout: 10000,
+      }),
+      axios.get('https://api.buygoods.com/affiliates/api/v1/commissions.php', {
+        params: { account_id: accountId, token, date_from: dates.from, date_to: dates.to },
+        timeout: 10000,
+      }),
+    ]);
+
+    // Agrega totais do /byday
+    const rows = bydayRes.status === 'fulfilled' ? (bydayRes.value.data?.data || []) : [];
+    const totalCommission = rows.reduce((s, r) => s + parseFloat(r.net_commissions ?? r.gross_commissions ?? 0), 0);
+    const totalConversions = rows.reduce((s, r) => s + parseInt(r.conversions_count ?? 0), 0);
+
+    // Produtos do endpoint de comissões da Buygoods
+    const prodData = productsRes.status === 'fulfilled' ? (productsRes.value.data?.data || []) : [];
+    const products = prodData
+      .filter(p => p.product_name && p.product_name !== '(No Product)')
+      .map(p => ({
+        name: p.product_name,
+        network: 'Buygoods',
+        conversions: parseInt(p.items ?? 0),
+        commission: parseFloat(p.net_commissions ?? p.item_commissions_amount ?? 0),
+      }))
+      .sort((a, b) => b.commission - a.commission)
+      .slice(0, 10);
+
     return {
       source: 'buygoods',
       status: 'ok',
-      data: {
-        totalCommission: d.total_commission ?? d.earnings ?? 0,
-        conversions: d.total_sales ?? d.conversions ?? 0,
-        products: (d.products || []).map(p => ({
-          name: p.name || p.product_name,
-          network: 'Buygoods',
-          conversions: p.sales || p.conversions || 0,
-          commission: p.commission || p.earnings || 0,
-        })),
-      },
+      data: { totalCommission, conversions: totalConversions, products },
     };
   } catch (err) {
     return { source: 'buygoods', status: 'error', error: err.message };
