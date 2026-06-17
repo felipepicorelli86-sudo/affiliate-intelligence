@@ -161,8 +161,8 @@ async function fetchMaxweb(days = 30, from = null, to = null) {
   const params = {
     a:             process.env.MAXWEB_AFFILIATE_ID,
     token:         process.env.MAXWEB_TOKEN,
-    from:          dates.from,
-    to:            dates.to,
+    date_from:     dates.from,
+    date_to:       dates.to,
     response_type: 'json',
   };
 
