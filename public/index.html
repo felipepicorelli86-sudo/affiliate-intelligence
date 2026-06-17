@@ -182,6 +182,13 @@
   .lb-bar-bg{height:3px;background:var(--surface2);border-radius:2px;margin-top:5px;}
   .lb-bar{height:3px;border-radius:2px;background:var(--accent);}
   .lb-avatar{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+  /* ── NETWORK FILTER BAR ─────────────────────────────────────── */
+  .net-filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:18px;flex-wrap:wrap;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+  .net-filter-label{font-size:10px;font-weight:600;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;margin-right:4px;}
+  .net-filter-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:12px;font-weight:500;transition:all .15s;}
+  .net-filter-pill:hover{border-color:var(--accent);color:var(--text);}
+  .net-filter-pill.pill-all{border-color:var(--accent);color:var(--accent);}
+  .net-filter-pill.pill-all.active{background:var(--accent);color:#fff;}
   /* ── MARKET SECTION ────────────────────────────────────────── */
   .section{display:none;}
   .section.visible{display:block;}
@@ -259,6 +266,7 @@
       <div class="alert-panel-title">Produtos abaixo do ROI minimo</div>
       <div id="alertItems"></div>
     </div>
+    <div id="netFilterBar" class="net-filter-bar"></div>
     <div class="kpi-grid">
       <div class="kpi-card k1"><div class="kpi-label">Comissao Total</div><div class="kpi-value" id="kpiComm">$18,432</div><div class="kpi-change up">23.4% vs mes anterior</div></div>
       <div class="kpi-card k2"><div class="kpi-label">Conversoes</div><div class="kpi-value" id="kpiConv">1,847</div><div class="kpi-change up">17.2% vs mes anterior</div></div>
@@ -583,7 +591,7 @@ async function loadCBData() {
     if (top) document.getElementById('mktStatGravity').textContent = top.gravity.toFixed(1);
     renderCBTable(mktCBData);
   } catch(e) {
-    document.getElementById('cbLoading').textContent = 'Backend offline ou sem dados. Rode: node server.js';
+    document.getElementById('cbLoading').textContent = 'Backend offline ou aguardando dados.';
   }
 }
 
@@ -979,7 +987,7 @@ function setPeriod(btn,days){document.querySelectorAll('.period-btn').forEach(b=
 // ── Backend integration ───────────────────────────────────────
 async function loadFromBackend(days=30,fromDate=null,toDate=null){
   try{
-    const statusRes=await fetch(`${API_BASE}/api/status`,{signal:AbortSignal.timeout(2000)});
+    const statusRes=await fetch(`${API_BASE}/api/status`,{signal:AbortSignal.timeout(8000)});
     const status=await statusRes.json();
     let url=`${API_BASE}/api/all?days=${days}`;
     if(fromDate)url+=`&from=${fromDate}`;if(toDate)url+=`&to=${toDate}`;
@@ -995,17 +1003,77 @@ function showBanner(type,networks,summary){
   const el=document.getElementById('connBanner');if(el)el.remove();
   const b=document.createElement('div');b.id='connBanner';
   if(type==='ok'){const ok=Object.values(networks).filter(Boolean).length,tot=Object.keys(networks).length;b.style.cssText='background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#00d4aa;display:flex;align-items:center;gap:8px';b.innerHTML=`OK <strong>Backend conectado</strong> - ${ok}/${tot} redes configuradas - ${summary?.networksError||0} com erro`;}
-  else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo - Backend nao encontrado. Abra o terminal na pasta affiliate-backend e rode: node server.js';}
+  else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo — Backend offline ou aguardando resposta. Dados reais indisponiveis no momento.';}
   document.querySelector('.topbar').after(b);
 }
+// ── NETWORK FILTER ────────// ── NETWORK FILTER ────────────────────────────────────────────
+let _currentProducts = [...DEMO_PRODUCTS];
+let _activeNets = new Set();
+
+function buildNetFilterBar() {
+  const bar = document.getElementById('netFilterBar');
+  if (!bar) return;
+  bar.innerHTML = '<span class="net-filter-label">Filtrar por rede:</span>' +
+    '<button class="net-filter-pill pill-all active" onclick="toggleNetAll(this)">Todas as redes</button>' +
+    NETWORKS.map(n => '<button class="net-filter-pill" onclick="toggleNetPill(this,\'' + n.name + '\')" data-net="' + n.name + '">' +
+      '<span style="width:7px;height:7px;border-radius:50%;background:' + n.color + ';display:inline-block;flex-shrink:0"></span>' + n.name + '</button>'
+    ).join('');
+}
+
+function toggleNetAll(btn) {
+  _activeNets.clear();
+  document.querySelectorAll('#netFilterBar .net-filter-pill').forEach(p => {
+    p.classList.remove('active');
+    p.style.cssText = '';
+  });
+  btn.classList.add('active');
+  applyNetFilter();
+}
+
+function toggleNetPill(btn, name) {
+  const allBtn = document.querySelector('#netFilterBar .pill-all');
+  if (_activeNets.has(name)) {
+    _activeNets.delete(name);
+    btn.classList.remove('active');
+    btn.style.cssText = '';
+    if (_activeNets.size === 0 && allBtn) allBtn.classList.add('active');
+  } else {
+    if (allBtn) allBtn.classList.remove('active');
+    _activeNets.add(name);
+    btn.classList.add('active');
+    const color = NETWORKS.find(n => n.name === name)?.color || 'var(--accent)';
+    btn.style.cssText = 'background:' + color + '22;border-color:' + color + ';color:' + color;
+  }
+  applyNetFilter();
+}
+
+function getFilteredProducts(data) {
+  if (_activeNets.size === 0) return data;
+  return (data || []).filter(p => _activeNets.has(p.net));
+}
+
+function applyNetFilter() {
+  const sub = document.querySelector('#sec-performance .subtitle');
+  if (sub) sub.textContent = _activeNets.size === 0
+    ? 'Todas as redes · Atualizado agora'
+    : [..._activeNets].join(', ') + ' · Filtrado';
+  _origRenderProducts(getFilteredProducts(_currentProducts));
+  setTimeout(checkRoiAlerts, 50);
+}
+
 const _origRenderProducts=renderProducts;
-function renderAndCheck(data){_origRenderProducts(data);setTimeout(checkRoiAlerts,50);}
+function renderAndCheck(data){
+  _currentProducts = data || DEMO_PRODUCTS;
+  _origRenderProducts(getFilteredProducts(_currentProducts));
+  setTimeout(checkRoiAlerts,50);
+}
 function openModal(){document.getElementById('modalBg').classList.add('open');}
 function closeModal(){document.getElementById('modalBg').classList.remove('open');}
 function addNetwork(){const name=document.getElementById('newNetName').value.trim();if(!name)return;const cols=['#e879f9','#38bdf8','#4ade80','#fb7185'];NETWORKS.push({name,color:cols[NETWORKS.length%cols.length],icon:name.slice(0,2).toUpperCase(),rev:0,roi:0,status:'active'});renderNetworks();renderNetworkCompare();closeModal();}
 
-// ── INIT ─────────────────────────────────────────────────────
+// ── INIT ─────────────────────────────────────────────
 initDatePicker();
+buildNetFilterBar();
 renderNetworks();
 renderLeaderboards();
 renderCross();
