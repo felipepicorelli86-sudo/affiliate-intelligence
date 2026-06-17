@@ -304,7 +304,7 @@ app.get('/api/status', (req, res) => {
     networks: {
       clickbank:     isConfigured('CLICKBANK_API_KEY', 'CLICKBANK_API_SECRET'),
       buygoods:      isConfigured('BUYGOODS_API_KEY'),
-      maxweb:        isConfigured('MAXWEB_API_KEY'),
+      maxweb:        isConfigured('MAXWEB_TOKEN', 'MAXWEB_AFFILIATE_ID'),
       gurumedia:     isConfigured('GURUMEDIA_API_KEY'),
       fellas_ads:    isConfigured('FELLAS_API_KEY'),
       media_scalers: isConfigured('MEDIA_SCALERS_API_KEY'),
