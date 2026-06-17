@@ -986,7 +986,7 @@ async function loadFromBackend(days=30,fromDate=null,toDate=null){
     const all=await(await fetch(url)).json();
     showBanner('ok',status.networks,all.summary);
     if(all.summary){document.getElementById('kpiComm').textContent='$'+Number(all.summary.totalCommission).toLocaleString('en-US',{maximumFractionDigits:0});document.getElementById('kpiConv').textContent=Number(all.summary.totalConversions).toLocaleString();}
-    if(status.networks){window._netStatus=status.networks;NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
+    if(status.networks){NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
     if(all.topProducts?.length){renderAndCheck(all.topProducts.map(p=>({name:p.name,net:p.network,country:'Global',cpc:0,conv:p.conversions,comm:p.commission,roi:0,status:p.commission>2000?'hot':p.commission>500?'scaling':'stable'})));}
     if(all.networks){const real=all.networks.filter(n=>n.status==='ok'&&n.data).map(n=>({name:n.source,color:NETWORKS.find(x=>x.name.toLowerCase()===n.source.toLowerCase())?.color||'#6c63ff',rev:parseFloat(n.data.totalCommission)||0}));if(real.length)renderNetworkCompare(real);}
   }catch{showBanner('demo');}
@@ -1015,4 +1015,6 @@ renderGeos();
 buildLineChart();
 buildPieChart();
 loadFromBackend(30);
-</s
+</script>
+</body>
+</html>
