@@ -1002,7 +1002,7 @@ async function loadFromBackend(days=30,fromDate=null,toDate=null){
 
     // Update network compare chart
     if(all.networks){const real=all.networks.filter(n=>n.status==='ok'&&n.data).map(n=>({name:n.source,color:NETWORKS.find(x=>x.name.toLowerCase()===n.source.toLowerCase())?.color||'#6c63ff',rev:parseFloat(n.data.totalCommission)||0}));if(real.length)renderNetworkCompare(real);}
-  }catch(e){console.error('Backend error:',e);showBanner('demo');}
+  }catch(e){console.error('Backend error:',e);showBanner('demo');loadMarketFallback();}
 }
 function showBanner(type,networks,summary,period){
   const el=document.getElementById('connBanner');if(el)el.remove();
@@ -1028,21 +1028,63 @@ function showBanner(type,networks,summary,period){
   }
 }
 
-// -- MARKET FALLBACK - dados publicos quando nao ha API configurada --
+// -- MARKET FALLBACK - dados publicos de mercado como referencia --
+function _parseComm(str){ const n=parseFloat(String(str||'').replace(/[^0-9.]/g,'')); return isNaN(n)?0:n; }
+let _marketFallbackLoaded=false;
 async function loadMarketFallback(){
+  if(_marketFallbackLoaded)return;
   try{
-    const res=await fetch(`${API_BASE}/api/market/clickbank?category=health&limit=20`);
+    const res=await fetch(`${API_BASE}/api/market/clickbank?category=health&limit=20`,{signal:AbortSignal.timeout(15000)});
     const data=await res.json();
     const prods=(data.products||[]).map(p=>({
-      name:p.name,net:'Clickbank (Publico)',country:'USA',cpc:0,
-      conv:Math.round(p.gravity||0),comm:0,roi:0,status:p.gravity>100?'hot':p.gravity>50?'scaling':'stable'
+      name:p.name,
+      net:'Mercado (Ref.)',
+      country:'USA',
+      cpc:0,
+      conv:Math.round(p.gravity||0),
+      comm:_parseComm(p.initComm)||_parseComm(p.avgComm)||0,
+      roi:0,
+      status:p.gravity>200?'hot':p.gravity>80?'scaling':'stable'
     }));
-    if(prods.length){
-      renderAndCheck(prods);
-      const b=document.getElementById('connBanner');
-      if(b)b.innerHTML+=' <span style="color:#a78bfa;margin-left:8px">Exibindo top ofertas publicas do Clickbank (sem dados de API)</span>';
-    }else{renderAndCheck([]);}
-  }catch(e){renderAndCheck([]);}
+    if(!prods.length){return;}
+    _marketFallbackLoaded=true;
+    renderAndCheck(prods);
+    // Leaderboard de produtos por gravity
+    const maxConv=Math.max(...prods.map(p=>p.conv),1);
+    document.getElementById('lbProducts').innerHTML=prods.slice(0,5).map((p,i)=>`
+      <div class="lb-row">
+        <div class="lb-pos ${posClass(i)}">${i+1}</div>
+        <div class="lb-info">
+          <div class="lb-name">${p.name}</div>
+          <div class="lb-detail">Gravity ${p.conv} &middot; Ref. mercado</div>
+          <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((p.conv/maxConv)*100)}%"></div></div>
+        </div>
+        <div class="lb-value">${p.conv}<span class="lb-change">gravity</span></div>
+      </div>`).join('');
+    // KPIs: mostra referencia de mercado
+    const el=document.getElementById('kpiComm');
+    if(el&&el.textContent==='—'){el.textContent='—';}
+    const cc=document.getElementById('kpiCommChange');
+    if(cc&&cc.textContent==='Carregando...')cc.textContent='Sem vendas no periodo';
+    const vc=document.getElementById('kpiConv');
+    if(vc&&vc.textContent==='—'){vc.textContent='0';}
+    const vcc=document.getElementById('kpiConvChange');
+    if(vcc&&vcc.textContent==='Carregando...')vcc.textContent='Sem conversoes no periodo';
+    const cpcc=document.getElementById('kpiCpcChange');
+    if(cpcc&&cpcc.textContent==='Carregando...')cpcc.textContent='Sem dados de CPC';
+    // Banner informativo
+    const b=document.getElementById('connBanner');
+    if(b)b.innerHTML+=' &middot; <span style="color:#a78bfa">Tabela exibe referencia de mercado (Clickbank publico)</span>';
+    else{
+      const nb=document.createElement('div');
+      nb.id='connBanner';
+      nb.style.cssText='background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#a78bfa;display:flex;align-items:center;gap:8px';
+      nb.innerHTML='Referencia de mercado &mdash; Nenhuma venda registrada no periodo. A tabela exibe top produtos do Clickbank publico como inspiracao.';
+      document.querySelector('.topbar').after(nb);
+    }
+  }catch(e){
+    ['kpiCommChange','kpiConvChange','kpiCpcChange'].forEach(id=>{const el=document.getElementById(id);if(el&&el.textContent==='Carregando...')el.textContent='—';});
+  }
 }
 
 // â”€â”€ NETWORK FILTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1159,11 +1201,11 @@ buildNetFilterBar();
 renderNetworks();
 renderLeaderboards();
 renderCross();
-renderAndCheck(DEMO_PRODUCTS);
 renderNetworkCompare();
 renderGeos();
 buildLineChart();
 buildPieChart();
+loadMarketFallback();
 loadFromBackend(30);
 </script>
 </body>
