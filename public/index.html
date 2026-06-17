@@ -226,6 +226,7 @@
   .prod-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.25);}
   .prod-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .prod-card-net{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;}
+  .prod-card-niche{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;padding:2px 7px;border-radius:5px;margin-bottom:6px;background:var(--surface2);color:var(--text2);}
   .prod-card-name{font-size:14px;font-weight:700;margin-bottom:3px;line-height:1.35;}
   .prod-card-vendor{font-size:11px;color:var(--text2);margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .prod-card-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
@@ -880,6 +881,7 @@ function renderProducts(data){
       +'<span class="prod-card-net" style="background:'+netColor+'22;color:'+netColor+'">'+p.net+'</span>'
       +'<div style="display:flex;align-items:center;gap:8px">'+statusTag+'<div class="opp-ring '+oppClass+'" title="Score de Oportunidade: '+opp+'">'+opp+'</div></div>'
       +'</div>'
+      +'<div class="prod-card-niche">'+(p.niche||'Health')+'</div>'
       +'<div class="prod-card-name">'+p.name+'</div>'
       +'<div class="prod-card-vendor">'+vendor+'</div>'
       +'<div class="prod-card-metrics">'
@@ -1057,6 +1059,7 @@ async function loadMarketAudit(category){
     if(sub)sub.textContent=(summary.total||0)+' produtos auditados · '+category+' · Dados publicos';
 
     // Mapeia para renderProducts
+    const NICHE_PT={'weight loss':'Perda de Peso','health':'Saude Geral','joint':'Articulacoes','blood sugar':'Acucar no Sangue','Diet & Weight Loss':'Perda de Peso','Mens Health':'Saude Masculina','Health & Wellness':'Saude','Home Goods':'Casa','dental':'Saude Dental','hearing':'Audicao','vision':'Visao','sleep':'Sono'};
     const mapped=products.map(p=>({
       name:p.name, net:p.network,
       country:(p.geos||'US,CA,GB,AU'),
@@ -1065,6 +1068,7 @@ async function loadMarketAudit(category){
       comm:p.commission||0,
       roi:p.vendor||'--',
       status:p.status||'stable',
+      niche:NICHE_PT[(p.category||'').toLowerCase()]||NICHE_PT[p.category]||(p.category||'Health'),
     }));
     _marketFallbackLoaded=true;
     renderAndCheck(mapped);
