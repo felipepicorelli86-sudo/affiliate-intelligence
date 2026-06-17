@@ -34,75 +34,6 @@ function isConfigured(...keys) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ── CLICKBANK ──────────────────────────────────────────────────
-// Docs: https://support.clickbank.com/en/articles/10535400-clickbank-apis
-// Auth: Basic base64(CLICKBANK_API_KEY:CLICKBANK_API_SECRET)
-// ═══════════════════════════════════════════════════════════════
-async function fetchClickbank(days = 30, from = null, to = null) {
-  if (!isConfigured('CLICKBANK_API_KEY', 'CLICKBANK_API_SECRET')) {
-    return { source: 'clickbank', status: 'no_credentials', data: null };
-  }
-
-  const dates = resolveDates(days, from, to);
-  const creds = Buffer.from(
-    `${process.env.CLICKBANK_API_KEY}:${process.env.CLICKBANK_API_SECRET}`
-  ).toString('base64');
-
-  const headers = {
-    Authorization: `Basic ${creds}`,
-    Accept: 'application/json',
-    'CB-VERSION': '1.3',
-  };
-
-  try {
-    // Sales summary
-    const [ordersRes, analyticsRes] = await Promise.allSettled([
-      axios.get('https://api.clkbank.com/1.3/orders', {
-        headers,
-        params: {
-          startDate: dates.from,
-          endDate: dates.to,
-          role: 'AFFILIATE',
-        },
-      }),
-      axios.get('https://api.clkbank.com/1.3/analytics/affiliate/sales', {
-        headers,
-        params: { startDate: dates.from, endDate: dates.to },
-      }),
-    ]);
-
-    const orders = ordersRes.status === 'fulfilled' ? ordersRes.value.data : null;
-    const analytics = analyticsRes.status === 'fulfilled' ? analyticsRes.value.data : null;
-
-    // Normalize
-    const totalComm = analytics?.totalCommission ?? orders?.totalCommissions ?? 0;
-    const conversions = analytics?.totalSales ?? orders?.orders?.length ?? 0;
-
-    // Top products from orders
-    const products = {};
-    (orders?.orders || []).forEach(o => {
-      const name = o.productTitle || o.sku || 'Unknown';
-      if (!products[name]) products[name] = { name, network: 'Clickbank', conversions: 0, commission: 0 };
-      products[name].conversions += 1;
-      products[name].commission += parseFloat(o.affiliateCommission || 0);
-    });
-
-    return {
-      source: 'clickbank',
-      status: 'ok',
-      data: {
-        totalCommission: totalComm,
-        conversions,
-        products: Object.values(products).sort((a, b) => b.commission - a.commission).slice(0, 10),
-        rawAnalytics: analytics,
-      },
-    };
-  } catch (err) {
-    return { source: 'clickbank', status: 'error', error: err.message };
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // ── BUYGOODS ───────────────────────────────────────────────────
 // Usa ClickCRM (mesmo do Maxweb) + endpoint próprio de comissões
 // Auth: account_id=BUYGOODS_AFFILIATE_ID & token=BUYGOODS_API_KEY
@@ -217,106 +148,6 @@ async function fetchMaxweb(days = 30, from = null, to = null) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ── HELPER EVERFLOW — usado por Gurumedia e Smashloud ──────────
-// Login Gurumedia:  stats.gurumedia.com  → Account → API Key
-// Login Smashloud:  smashloud.everflowclient.io → Account → API Key
-// Ambos usam a mesma estrutura de API Everflow
-// ═══════════════════════════════════════════════════════════════
-async function fetchEverflow(source, apiKey, apiBase, days = 30, from = null, to = null) {
-  const dates = resolveDates(days, from, to);
-  try {
-    const res = await axios.post(
-      `${apiBase}/v1/affiliate/reporting/performance`,
-      {
-        from: dates.from,
-        to: dates.to,
-        timezone_id: 80, // UTC
-        currency_id: 'USD',
-        columns: ['affiliate_id', 'offer_id', 'offer_name', 'conversions', 'payout'],
-      },
-      {
-        headers: {
-          'X-Eflow-API-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const rows = res.data?.table?.rows || res.data?.rows || [];
-    const totalComm = rows.reduce((s, r) => s + (parseFloat(r.payout) || 0), 0);
-    const totalConv = rows.reduce((s, r) => s + (parseInt(r.conversions) || 0), 0);
-
-    return {
-      source,
-      status: 'ok',
-      data: {
-        totalCommission: totalComm,
-        conversions: totalConv,
-        products: rows.map(r => ({
-          name: r.offer_name || r.name || 'Offer #' + r.offer_id,
-          network: source,
-          conversions: parseInt(r.conversions) || 0,
-          commission: parseFloat(r.payout) || 0,
-        })).sort((a, b) => b.commission - a.commission).slice(0, 10),
-      },
-    };
-  } catch (err) {
-    return { source, status: 'error', error: err.message };
-  }
-}
-
-// Gurumedia — Everflow em stats.gurumedia.com
-// API Key: stats.gurumedia.com → login → Account Settings → API Key
-async function fetchGurumedia(days = 30, from = null, to = null) {
-  if (!isConfigured('GURUMEDIA_API_KEY')) return { source: 'gurumedia', status: 'no_credentials', data: null };
-  return fetchEverflow('gurumedia', process.env.GURUMEDIA_API_KEY, 'https://api.gurumedia.com', days, from, to);
-}
-
-// Smashloud — Everflow em smashloud.everflowclient.io
-// API Key: smashloud.everflowclient.io → login → Account Settings → API Key
-async function fetchSmashloud(days = 30, from = null, to = null) {
-  if (!isConfigured('SMASHLOUD_API_KEY')) return { source: 'smashloud', status: 'no_credentials', data: null };
-  return fetchEverflow('smashloud', process.env.SMASHLOUD_API_KEY, 'https://api.eflow.team', days, from, to);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ── REDES SEM API CONFIRMADA
-// Fellas Ads: domínio inacessível (verificar URL real com o suporte)
-// Smart ADV:  site institucional apenas, sem portal de afiliado
-// Media Scalers: sem API — usar postback S2S
-// ═══════════════════════════════════════════════════════════════
-async function fetchGenericNetwork(name, envKey, baseUrl, days = 30) {
-  if (!isConfigured(envKey)) {
-    return { source: name.toLowerCase().replace(/ /g, '_'), status: 'no_credentials', data: null };
-  }
-
-  try {
-    const res = await axios.get(`${baseUrl}/stats`, {
-      headers: { Authorization: `Bearer ${process.env[envKey]}`, Accept: 'application/json' },
-      params: { date_from: daysAgo(days), date_to: daysAgo(0) },
-    });
-
-    const d = res.data;
-    return {
-      source: name,
-      status: 'ok',
-      data: {
-        totalCommission: d.commission ?? d.earnings ?? d.revenue ?? 0,
-        conversions: d.conversions ?? d.sales ?? 0,
-        products: (d.products || d.offers || []).map(p => ({
-          name: p.name || p.offer_name,
-          network: name,
-          conversions: p.conversions || 0,
-          commission: p.commission || p.payout || 0,
-        })),
-      },
-    };
-  } catch (err) {
-    return { source: name, status: 'error', error: err.message };
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // ROUTES
 // ═══════════════════════════════════════════════════════════════
 
@@ -324,14 +155,8 @@ async function fetchGenericNetwork(name, envKey, baseUrl, days = 30) {
 app.get('/api/status', (req, res) => {
   res.json({
     networks: {
-      clickbank:     isConfigured('CLICKBANK_API_KEY', 'CLICKBANK_API_SECRET'),
-      buygoods:      isConfigured('BUYGOODS_API_KEY'),
-      maxweb:        isConfigured('MAXWEB_TOKEN', 'MAXWEB_AFFILIATE_ID'),
-      gurumedia:     isConfigured('GURUMEDIA_API_KEY'),
-      fellas_ads:    isConfigured('FELLAS_API_KEY'),
-      media_scalers: isConfigured('MEDIA_SCALERS_API_KEY'),
-      smart_adv:     isConfigured('SMART_ADV_API_KEY'),
-      smashloud:     isConfigured('SMASHLOUD_API_KEY'),
+      buygoods: isConfigured('BUYGOODS_API_KEY', 'BUYGOODS_AFFILIATE_ID'),
+      maxweb:   isConfigured('MAXWEB_TOKEN', 'MAXWEB_AFFILIATE_ID'),
     },
   });
 });
@@ -342,23 +167,12 @@ app.get('/api/all', async (req, res) => {
   const from = req.query.from || null;
   const to   = req.query.to   || null;
 
-  const [cb, bg, mw, gm, sl] = await Promise.all([
-    fetchClickbank(days, from, to),
+  const [bg, mw] = await Promise.all([
     fetchBuygoods(days, from, to),
     fetchMaxweb(days, from, to),
-    fetchGurumedia(days, from, to),
-    fetchSmashloud(days, from, to),
   ]);
 
-  // Media Scalers e Fellas Ads: sem API — dados via postback
-  const ms = {
-    source: 'media_scalers',
-    status: 'no_api',
-    message: 'Sem API de afiliado. Configure postback S2S: http://SEU_IP:3001/api/postback',
-    data: null,
-  };
-
-  const results = [cb, bg, mw, gm, sl, ms];
+  const results = [bg, mw];
 
   // Agrega tudo
   let totalCommission = 0;
@@ -391,12 +205,8 @@ app.get('/api/all', async (req, res) => {
   });
 });
 
-// GET /api/clickbank?days=30
-app.get('/api/clickbank',    async (req, res) => res.json(await fetchClickbank(parseInt(req.query.days) || 30)));
-app.get('/api/buygoods',     async (req, res) => res.json(await fetchBuygoods(parseInt(req.query.days) || 30)));
-app.get('/api/maxweb',       async (req, res) => res.json(await fetchMaxweb(parseInt(req.query.days) || 30)));
-app.get('/api/gurumedia',    async (req, res) => res.json(await fetchGurumedia(parseInt(req.query.days) || 30)));
-app.get('/api/smashloud',   async (req, res) => res.json(await fetchSmashloud(parseInt(req.query.days) || 30)));
+app.get('/api/buygoods', async (req, res) => res.json(await fetchBuygoods(parseInt(req.query.days) || 30)));
+app.get('/api/maxweb',   async (req, res) => res.json(await fetchMaxweb(parseInt(req.query.days) || 30)));
 
 // ═══════════════════════════════════════════════════════════════
 // POSTBACKS S2S — recebe conversões de Media Scalers, Maxweb, etc.
