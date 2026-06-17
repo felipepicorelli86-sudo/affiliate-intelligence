@@ -3,7 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
+const NodeCache = require('node-cache');
 const publicData = require('./public-data');
+const scrapers = require('./scrapers');
+
+const scraperCache = new NodeCache({ stdTTL: 7200 });
 
 const app = express();
 app.use(cors());
@@ -292,6 +296,31 @@ app.get('/api/market/audit', async (req, res) => {
       }));
     }
 
+    // MaxWeb scraped — busca direta do marketplace público da MaxWeb
+    if (network === 'all' || network === 'maxweb') {
+      try {
+        const mwCacheKey = 'scrape_maxweb';
+        const mwProducts = scraperCache.has(mwCacheKey)
+          ? scraperCache.get(mwCacheKey).products
+          : await scrapers.scrapeMaxweb();
+        if (!scraperCache.has(mwCacheKey)) scraperCache.set(mwCacheKey, { products: mwProducts });
+
+        (mwProducts || []).forEach(p => {
+          const comm = parseFloat(p.commission || 0);
+          products.push({
+            name: p.name, network: 'MaxWeb',
+            category: p.niche || 'Health & Fitness',
+            commission: comm, avgComm: `$${comm.toFixed(2)}`,
+            gravity: p.gravity || 0, vendor: p.vendor || '',
+            geos: Array.isArray(p.geos) ? p.geos.join(',') : (p.geos || 'US,CA,GB,AU'),
+            status: p.trend === 'rising' ? 'hot' : p.trend === 'stable' ? 'stable' : 'scaling',
+          });
+        });
+      } catch (e) {
+        console.warn('[Audit/MaxWeb scraper]', e.message);
+      }
+    }
+
     // MediaScalers — 26 ofertas reais com payout real
     if (network === 'all' || network === 'mediascalers') {
       const msResult = publicData.getMediaScalersOffers();
@@ -333,6 +362,48 @@ app.get('/api/market/audit', async (req, res) => {
       summary: { total: products.length, bestCommission: bestComm, bestGravity, topCategory },
       products,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/market/scrape — executa todos os scrapers (CB, OV, Muncheye, WP, MaxWeb)
+app.get('/api/market/scrape', async (req, res) => {
+  try {
+    const cacheKey = 'scrape_all';
+    if (scraperCache.has(cacheKey)) return res.json(scraperCache.get(cacheKey));
+
+    const result = await scrapers.scrapeAll();
+
+    // Conta total de produtos por fonte
+    const summary = {
+      clickbank:   (result.clickbank   || []).length,
+      offervault:  (result.offervault  || []).length,
+      muncheye:    (result.muncheye    || []).length,
+      warriorplus: (result.warriorplus || []).length,
+      maxweb:      (result.maxweb      || []).length,
+      total: 0,
+      scrapedAt: result.scrapedAt,
+    };
+    summary.total = summary.clickbank + summary.offervault + summary.muncheye + summary.warriorplus + summary.maxweb;
+
+    const response = { summary, ...result };
+    scraperCache.set(cacheKey, response);
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/market/scrape/maxweb — somente MaxWeb público
+app.get('/api/market/scrape/maxweb', async (req, res) => {
+  try {
+    const cacheKey = 'scrape_maxweb';
+    if (scraperCache.has(cacheKey)) return res.json(scraperCache.get(cacheKey));
+    const products = await scrapers.scrapeMaxweb();
+    const result = { network: 'MaxWeb', total: products.length, products, scrapedAt: new Date().toISOString() };
+    scraperCache.set(cacheKey, result);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
