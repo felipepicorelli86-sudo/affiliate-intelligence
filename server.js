@@ -266,23 +266,20 @@ app.get('/api/market/buygoods', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET /api/market/audit — agrega Clickbank + Buygoods para auditoria de oportunidades
+// GET /api/market/audit — agrega Clickbank + MediaScalers para auditoria de oportunidades
 app.get('/api/market/audit', async (req, res) => {
   try {
     const category = req.query.category || 'health';
     const network  = req.query.network  || 'all';
 
-    const [cbRes, bgRes] = await Promise.allSettled([
-      publicData.getClickbankTopProducts(category, 50),
-      publicData.getBuygoodsMarketplace(30),
-    ]);
-
     const parseComm = s => parseFloat(String(s || '0').replace(/[^0-9.]/g, '')) || 0;
 
     let products = [];
 
-    if (cbRes.status === 'fulfilled' && (network === 'all' || network === 'clickbank')) {
-      (cbRes.value.products || []).forEach(p => products.push({
+    // Clickbank — banco curado (síncrono, sempre retorna dados)
+    if (network === 'all' || network === 'clickbank') {
+      const cbResult = publicData.getClickbankTopProducts(category, 50);
+      (cbResult.products || []).forEach(p => products.push({
         name:       p.name,
         network:    'Clickbank',
         category:   p.category || category,
@@ -290,25 +287,28 @@ app.get('/api/market/audit', async (req, res) => {
         avgComm:    p.avgComm || '',
         gravity:    p.gravity || 0,
         vendor:     p.vendor || '',
-        geos:       'US,CA,GB,AU',
+        geos:       p.geos || 'US,CA,GB,AU',
         status:     p.gravity > 200 ? 'hot' : p.gravity > 80 ? 'scaling' : 'stable',
       }));
     }
 
-    if (bgRes.status === 'fulfilled' && (network === 'all' || network === 'buygoods')) {
-      (bgRes.value.products || bgRes.value.offers || []).forEach(p => {
-        const name = p.name || p.title || p.product_name;
+    // MediaScalers — 26 ofertas reais com payout real
+    if (network === 'all' || network === 'mediascalers') {
+      const msResult = publicData.getMediaScalersOffers();
+      (msResult.offers || []).forEach(p => {
+        const name = p.name || p.title;
         if (!name) return;
+        const comm = parseFloat(p.payout || p.commission || 0);
         products.push({
           name,
-          network:    'Buygoods',
+          network:    'MediaScalers',
           category:   p.category || 'Health',
-          commission: parseComm(p.payout || p.commission || p.price),
-          avgComm:    '',
+          commission: comm,
+          avgComm:    `$${comm.toFixed(2)}`,
           gravity:    0,
-          vendor:     '',
-          geos:       'US,CA,GB,AU',
-          status:     (p.badge || '').toLowerCase().includes('best') ? 'hot' : 'stable',
+          vendor:     p.vendor || '',
+          geos:       p.countries || 'US,CA,GB,AU',
+          status:     comm >= 100 ? 'hot' : comm >= 60 ? 'scaling' : 'stable',
         });
       });
     }
