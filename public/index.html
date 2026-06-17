@@ -161,6 +161,9 @@
   
   
   
+  .period-selector{display:flex;gap:4px;}
+  .period-btn{padding:6px 16px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:12px;font-weight:500;transition:all .15s;}
+  .period-btn.active,.period-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
   .leaderboard-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;}
   .lb-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
   .lb-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
@@ -235,8 +238,11 @@
   <!-- ═══════════════════════════════════ PERFORMANCE SECTION ═══════════════════════════ -->
   <div id="sec-performance" class="section visible">
     <div class="topbar">
-      <div><h2>Dashboard de Performance</h2><div class="subtitle">Todas as redes · Atualizado agora</div></div>
-      
+      <div><h2>Dashboard de Performance</h2><div class="subtitle" id="perfSubtitle">Todas as redes · Atualizado agora</div></div>
+      <div class="period-selector">
+        <button class="period-btn" onclick="setPeriod(this,7)">7D</button>
+        <button class="period-btn active" onclick="setPeriod(this,30)">30D</button>
+      </div>
     </div>
     
     
@@ -994,6 +1000,15 @@ function updateCountdown(){const el=document.getElementById('refreshCountdown');
 
 
 // ── Backend integration ───────────────────────────────────────
+function setPeriod(btn,days){
+  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['kpiComm','kpiConv','kpiCpc'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='...';});
+  const sub=document.getElementById('perfSubtitle');
+  if(sub)sub.textContent=`Ultimos ${days} dias · Carregando...`;
+  loadFromBackend(days);
+}
+
 async function loadFromBackend(days=30,fromDate=null,toDate=null){
   try{
     const statusRes=await fetch(`${API_BASE}/api/status`,{signal:AbortSignal.timeout(8000)});
@@ -1048,7 +1063,7 @@ function showBanner(type,networks,summary,period){
   else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo — Backend offline ou sem resposta. Os valores abaixo sao ilustrativos.';}
   document.querySelector('.topbar').after(b);
   // Update subtitle
-  const sub=document.querySelector('#sec-performance .subtitle');
+  const sub=document.getElementById('perfSubtitle');
   if(sub&&type==='ok'){
     const comm=Number(summary?.totalCommission)||0;
     const conv=Number(summary?.totalConversions)||0;
@@ -2005,7 +2020,7 @@ function showBanner(type,networks,summary,period){
   else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo — Backend offline ou sem resposta. Os valores abaixo sao ilustrativos.';}
   document.querySelector('.topbar').after(b);
   // Update subtitle
-  const sub=document.querySelector('#sec-performance .subtitle');
+  const sub=document.getElementById('perfSubtitle');
   if(sub&&type==='ok'){
     const comm=Number(summary?.totalCommission)||0;
     const conv=Number(summary?.totalConversions)||0;
