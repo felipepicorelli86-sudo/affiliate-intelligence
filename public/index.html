@@ -36,9 +36,9 @@
   .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
   .topbar h2{font-size:22px;font-weight:700;}
   .topbar .subtitle{font-size:13px;color:var(--text2);margin-top:3px;}
-  .period-selector{display:flex;gap:4px;}
-  .period-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:12px;transition:all .15s;}
-  .period-btn.active,.period-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+  
+  
+  
   .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
   .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;}
   .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
@@ -236,31 +236,9 @@
   <div id="sec-performance" class="section visible">
     <div class="topbar">
       <div><h2>Dashboard de Performance</h2><div class="subtitle">Todas as redes · Atualizado agora</div></div>
-      <div class="period-selector">
-        <button class="period-btn" onclick="setPeriod(this,7)">7D</button>
-        <button class="period-btn active" onclick="setPeriod(this,30)">30D</button>
-        <button class="period-btn" onclick="setPeriod(this,90)">90D</button>
-      </div>
+      
     </div>
-    <div class="toolbar">
-      <div class="toolbar-label">Periodo:</div>
-      <input type="date" class="date-input" id="dateFrom">
-      <span class="toolbar-sep">-&gt;</span>
-      <input type="date" class="date-input" id="dateTo">
-      <button class="toolbar-btn" onclick="applyDateFilter()">Aplicar</button>
-      <span class="toolbar-sep" style="margin:0 2px">|</span>
-      <button class="toolbar-btn" onclick="exportToExcel()">Exportar Excel</button>
-      <div class="roi-control">
-        <span class="toolbar-label">Alerta ROI &lt;</span>
-        <input type="number" class="roi-input" id="roiThreshold" value="150" min="0" max="9999" onchange="checkRoiAlerts()">
-        <span class="toolbar-label">%</span>
-      </div>
-      <div class="toolbar-right">
-        <div class="auto-refresh-dot" id="refreshDot" style="display:none"></div>
-        <span class="refresh-countdown" id="refreshCountdown"></span>
-        <button class="toolbar-btn" id="autoRefreshBtn" onclick="toggleAutoRefresh()">Auto-refresh: OFF</button>
-      </div>
-    </div>
+    
     <div class="alert-panel" id="alertPanel">
       <div class="alert-panel-title">Produtos abaixo do ROI minimo</div>
       <div id="alertItems"></div>
@@ -992,8 +970,8 @@ function selectCross(item,mode){crossSelected=item;if(mode==='by-country')render
 function drillDown(product,country){crossMode='by-product';crossSelected=product;document.querySelectorAll('.cross-tab').forEach((b,i)=>b.classList.toggle('active',i===2));renderCross();}
 
 // ── Date / Export / ROI / Refresh ────────────────────────────
-function initDatePicker(){const today=new Date();const d30=new Date();d30.setDate(today.getDate()-30);const fmt=d=>d.toISOString().split('T')[0];document.getElementById('dateFrom').value=fmt(d30);document.getElementById('dateTo').value=fmt(today);}
-function applyDateFilter(){const from=document.getElementById('dateFrom').value;const to=document.getElementById('dateTo').value;if(!from||!to)return;const diffDays=Math.ceil((new Date(to)-new Date(from))/86400000);document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));loadFromBackend(diffDays,from,to);}
+
+
 function exportToExcel(){
   const wb=XLSX.utils.book_new();
   const headers=['#','Produto','Rede','Pais Top','CPC ($)','Conversoes','Comissao ($)','ROI (%)','Status'];
@@ -1022,7 +1000,7 @@ function toggleAutoRefresh(){
   autoRefreshTimer=setInterval(()=>{autoRefreshSeconds--;updateCountdown();},1000);
 }
 function updateCountdown(){const el=document.getElementById('refreshCountdown');const m=Math.floor(autoRefreshSeconds/60);const s=autoRefreshSeconds%60;el.textContent=`proximo em ${m}:${String(s).padStart(2,'0')}`;}
-function setPeriod(btn,days){document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadFromBackend(days);}
+
 
 // ── Backend integration ───────────────────────────────────────
 async function loadFromBackend(days=30,fromDate=null,toDate=null){
@@ -1032,19 +1010,62 @@ async function loadFromBackend(days=30,fromDate=null,toDate=null){
     let url=`${API_BASE}/api/all?days=${days}`;
     if(fromDate)url+=`&from=${fromDate}`;if(toDate)url+=`&to=${toDate}`;
     const all=await(await fetch(url)).json();
-    showBanner('ok',status.networks,all.summary);
-    if(all.summary){document.getElementById('kpiComm').textContent='$'+Number(all.summary.totalCommission).toLocaleString('en-US',{maximumFractionDigits:0});document.getElementById('kpiConv').textContent=Number(all.summary.totalConversions).toLocaleString();}
+    showBanner('ok',status.networks,all.summary,{days,fromDate,toDate});
+
+    // Update KPIs from real data
+    if(all.summary){
+      const comm=Number(all.summary.totalCommission)||0;
+      const conv=Number(all.summary.totalConversions)||0;
+      document.getElementById('kpiComm').textContent='$'+comm.toLocaleString('en-US',{maximumFractionDigits:0});
+      document.getElementById('kpiConv').textContent=conv.toLocaleString();
+      // Calculate CPC and ROI from real products if available
+      const realProds=all.topProducts||[];
+      const avgCpc=realProds.length?realProds.reduce((s,p)=>s+(p.cpc||0),0)/realProds.length:null;
+      const avgRoi=conv>0&&comm>0?Math.round((comm/(conv*0.5))*100):null;
+      if(avgCpc!==null)document.getElementById('kpiCpc').textContent='$'+avgCpc.toFixed(2);
+      else if(conv===0&&comm===0)document.getElementById('kpiCpc').textContent='$0.00';
+      if(avgRoi!==null)document.getElementById('kpiRoi').textContent=avgRoi+'%';
+      else if(conv===0&&comm===0)document.getElementById('kpiRoi').textContent='0%';
+    }
+
+    // Update networks status
     if(status.networks){window._netStatus=status.networks;NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
-    if(all.topProducts?.length){renderAndCheck(all.topProducts.map(p=>({name:p.name,net:p.network,country:'Global',cpc:0,conv:p.conversions,comm:p.commission,roi:0,status:p.commission>2000?'hot':p.commission>500?'scaling':'stable'})));}
+
+    // Update products & charts
+    if(all.topProducts?.length){
+      const mapped=all.topProducts.map(p=>({name:p.name,net:p.network,country:p.country||'Global',cpc:p.cpc||0,conv:p.conversions||0,comm:p.commission||0,roi:p.roi||0,status:p.commission>2000?'hot':p.commission>500?'scaling':'stable'}));
+      renderAndCheck(mapped);
+    } else if(all.summary&&Number(all.summary.totalCommission)===0&&Number(all.summary.totalConversions)===0){
+      // Backend responded with real zeros — show empty state instead of demo data
+      renderAndCheck([]);
+    }
+
+    // Update network compare chart
     if(all.networks){const real=all.networks.filter(n=>n.status==='ok'&&n.data).map(n=>({name:n.source,color:NETWORKS.find(x=>x.name.toLowerCase()===n.source.toLowerCase())?.color||'#6c63ff',rev:parseFloat(n.data.totalCommission)||0}));if(real.length)renderNetworkCompare(real);}
-  }catch{showBanner('demo');}
+  }catch(e){console.error('Backend error:',e);showBanner('demo');}
 }
-function showBanner(type,networks,summary){
+function showBanner(type,networks,summary,period){
   const el=document.getElementById('connBanner');if(el)el.remove();
   const b=document.createElement('div');b.id='connBanner';
-  if(type==='ok'){const ok=Object.values(networks).filter(Boolean).length,tot=Object.keys(networks).length;b.style.cssText='background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#00d4aa;display:flex;align-items:center;gap:8px';b.innerHTML=`<strong>Backend conectado</strong> - ${ok}/${tot} redes configuradas - ${summary?.networksError||0} com erro`;}
-  else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo — Backend offline ou aguardando resposta. Dados reais indisponiveis no momento.';}
+  if(type==='ok'){
+    const ok=Object.values(networks).filter(Boolean).length,tot=Object.keys(networks).length;
+    const comm=Number(summary?.totalCommission)||0;
+    const conv=Number(summary?.totalConversions)||0;
+    const dataLabel=comm===0&&conv===0?'<span style="color:#ffa940"> · Sem dados no periodo selecionado</span>':'';
+    const periodLabel=period?.fromDate?` · ${period.fromDate} → ${period.toDate}`:(period?.days?` · Ultimos ${period.days} dias`:'');
+    b.style.cssText='background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#00d4aa;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    b.innerHTML=`<strong>Backend conectado</strong> · ${ok}/${tot} redes${periodLabel}${dataLabel}`;
+  }
+  else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo — Backend offline ou sem resposta. Os valores abaixo sao ilustrativos.';}
   document.querySelector('.topbar').after(b);
+  // Update subtitle
+  const sub=document.querySelector('#sec-performance .subtitle');
+  if(sub&&type==='ok'){
+    const comm=Number(summary?.totalCommission)||0;
+    const conv=Number(summary?.totalConversions)||0;
+    const periodLabel=period?.fromDate?`${period.fromDate} → ${period.toDate}`:(period?.days?`Ultimos ${period.days} dias`:'');
+    sub.textContent=comm===0&&conv===0?`${periodLabel} · Sem dados no periodo`:`${periodLabel} · ${ok}/${tot} redes ativas`;
+  }
 }
 
 // ── NETWORK FILTER ────────────────────────────────────────────
@@ -1156,7 +1177,7 @@ function toggleNetFromSidebar(name) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────
-initDatePicker();
+
 buildNetFilterBar();
 renderNetworks();
 renderLeaderboards();
