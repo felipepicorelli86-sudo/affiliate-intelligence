@@ -252,7 +252,89 @@ async function getTrendsByCountry(keyword = 'weight loss supplement') {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 5. AGREGADO COMPLETO — uma única chamada para o dashboard
+// 5. BUYGOODS MARKETPLACE — ofertas públicas sem login
+//    URL: https://www.buygoods.com/marketplace
+// ══════════════════════════════════════════════════════════════
+async function getBuygoodsMarketplace(limit = 30) {
+  const cacheKey = `buygoods_mkt_${limit}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const products = [];
+  try {
+    const res = await axios.get('https://www.buygoods.com/marketplace', {
+      headers: HEADERS,
+      timeout: 12000,
+    });
+    const $ = cheerio.load(res.data);
+
+    // Selectors comuns em páginas de marketplace de afiliados
+    $('[class*="product"], [class*="offer"], [class*="item"], article').each((_, el) => {
+      const row = $(el);
+      const name    = row.find('[class*="title"], [class*="name"], h2, h3').first().text().trim();
+      const comm    = row.find('[class*="commission"], [class*="payout"], [class*="earn"]').first().text().trim();
+      const cat     = row.find('[class*="category"], [class*="niche"]').first().text().trim();
+
+      if (name && name.length > 3) {
+        products.push({
+          name,
+          commission: comm || 'N/A',
+          category: cat || 'Health',
+          network: 'Buygoods',
+        });
+      }
+    });
+  } catch (err) {
+    console.warn(`[Buygoods Marketplace] Erro: ${err.message}`);
+  }
+
+  const result = { products: products.slice(0, limit), total: products.length, updatedAt: new Date().toISOString() };
+  cache.set(cacheKey, result);
+  return result;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 6. OFFERVAULT POR REDE — filtra ofertas de uma rede específica
+//    Cobre: Maxweb, Gurumedia, Smashloud, Clickbank, Buygoods
+// ══════════════════════════════════════════════════════════════
+async function getOffersByNetwork(networkName, keyword = 'health') {
+  const cacheKey = `ovnet_${networkName.toLowerCase()}_${keyword}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const allOffers = [];
+  const CATEGORIES = ['health', 'weight loss', 'blood sugar', 'dental', 'joint'];
+
+  for (const kw of CATEGORIES) {
+    try {
+      const url = `https://www.offervault.com/offers/search/index/?keyword=${encodeURIComponent(kw)}&network=${encodeURIComponent(networkName)}&sf=PAID&sb=desc&pg=1&display=25`;
+      const res = await axios.get(url, { headers: HEADERS, timeout: 10000 });
+      const $ = cheerio.load(res.data);
+
+      $('.offer-result-row, .search-result, tr.offer').each((_, el) => {
+        const row = $(el);
+        const name    = row.find('.offer-name, .name, td:nth-child(2)').first().text().trim();
+        const network = row.find('.network-name, .network, td:nth-child(4)').first().text().trim();
+        const payout  = row.find('.payout, .commission, td:nth-child(3)').first().text().trim();
+        const geos    = row.find('.geo, .countries, td:nth-child(5)').first().text().trim();
+
+        // Filtra pelo nome da rede
+        if (name && name.length > 2 && (!network || network.toLowerCase().includes(networkName.toLowerCase()))) {
+          allOffers.push({ name, network: network || networkName, payout: payout || 'N/A', geos: geos || 'US', category: kw });
+        }
+      });
+      await new Promise(r => setTimeout(r, 400));
+    } catch (err) {
+      console.warn(`[OfferVault/${networkName}] ${kw}: ${err.message}`);
+    }
+  }
+
+  const unique = [...new Map(allOffers.map(o => [o.name.toLowerCase(), o])).values()];
+  const result = { network: networkName, offers: unique, total: unique.length, updatedAt: new Date().toISOString() };
+  cache.set(cacheKey, result);
+  return result;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 7. AGREGADO COMPLETO — uma única chamada para o dashboard
 // ══════════════════════════════════════════════════════════════
 async function getAllPublicData() {
   const cacheKey = 'public_all';
@@ -279,4 +361,4 @@ async function getAllPublicData() {
   return result;
 }
 
-module.exports = { getOfferVaultOffers, getClickbankTopProducts, getGoogleTrends, getTrendsByCountry, getAllPublicData };
+module.exports = { getOfferVaultOffers, getClickbankTopProducts, getGoogleTrends, getTrendsByCountry, getAllPublicData, getBuygoodsMarketplace, getOffersByNetwork };

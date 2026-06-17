@@ -440,6 +440,17 @@ app.get('/api/market/countries', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/market/buygoods', async (req, res) => {
+  try { res.json(await publicData.getBuygoodsMarketplace(parseInt(req.query.limit) || 30)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/market/network/:name — ofertas públicas de uma rede específica via OfferVault
+app.get('/api/market/network/:name', async (req, res) => {
+  try { res.json(await publicData.getOffersByNetwork(req.params.name, req.query.keyword || 'health')); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.listen(PORT, () => {
   console.log(`[Affiliate Hub] Servidor rodando na porta ${PORT}`);
   console.log('[Affiliate Hub] Endpoints:');
