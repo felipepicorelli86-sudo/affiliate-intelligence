@@ -272,18 +272,7 @@
       <div class="kpi-card k3"><div class="kpi-label">CPC Medio</div><div class="kpi-value" id="kpiCpc">$0.38</div><div class="kpi-change down">4.1% vs mes anterior</div></div>
       <div class="kpi-card k4"><div class="kpi-label">ROI Medio</div><div class="kpi-value" id="kpiRoi">284%</div><div class="kpi-change up">31.8% vs mes anterior</div></div>
     </div>
-    <div class="charts-grid">
-      <div class="chart-card">
-        <div class="chart-title">Receita por Rede - Evolucao</div>
-        <div class="chart-subtitle">Comissoes diarias agregadas por plataforma</div>
-        <div style="position:relative;height:220px"><canvas id="revenueChart"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Distribuicao de Receita</div>
-        <div class="chart-subtitle">% por rede de afiliados</div>
-        <div style="position:relative;height:220px"><canvas id="pieChart"></canvas></div>
-      </div>
-    </div>
+    
     <div class="leaderboard-grid">
       <div class="lb-card">
         <div class="lb-header"><div class="lb-icon" style="background:rgba(108,99,255,.15)">Prod</div><div><div class="lb-title">Top Produtores</div><div class="lb-sub">Por comissao gerada para voce</div></div></div>
@@ -298,6 +287,14 @@
         <div id="lbCountries"></div>
       </div>
     </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div><div class="chart-title">Produtos Mais Escalados</div><div class="chart-subtitle">Ranking completo por comissao gerada</div></div>
+        <input class="search-input" placeholder="Buscar produto..." oninput="filterTable(this.value)">
+      </div>
+      <table><thead><tr><th>#</th><th>Produto</th><th>Pais Top</th><th>CPC</th><th>Conversoes</th><th>Comissao</th><th>ROI</th><th>Status</th></tr></thead>
+      <tbody id="productsBody"></tbody></table>
+    </div>
     <div class="chart-card cross-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div><div class="chart-title">Cruzamento Produto x Pais</div><div class="chart-subtitle">Clique em um item para ver o detalhamento</div></div>
@@ -308,14 +305,6 @@
         </div>
       </div>
       <div id="crossContent"></div>
-    </div>
-    <div class="table-card">
-      <div class="table-header">
-        <div><div class="chart-title">Produtos Mais Escalados</div><div class="chart-subtitle">Ranking completo por comissao gerada</div></div>
-        <input class="search-input" placeholder="Buscar produto..." oninput="filterTable(this.value)">
-      </div>
-      <table><thead><tr><th>#</th><th>Produto</th><th>Pais Top</th><th>CPC</th><th>Conversoes</th><th>Comissao</th><th>ROI</th><th>Status</th></tr></thead>
-      <tbody id="productsBody"></tbody></table>
     </div>
     <div class="bottom-grid">
       <div class="chart-card">
@@ -329,6 +318,19 @@
         <div id="geoList"></div>
       </div>
     </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Receita por Rede - Evolucao</div>
+        <div class="chart-subtitle">Comissoes diarias agregadas por plataforma</div>
+        <div style="position:relative;height:220px"><canvas id="revenueChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Distribuicao de Receita</div>
+        <div class="chart-subtitle">% por rede de afiliados</div>
+        <div style="position:relative;height:220px"><canvas id="pieChart"></canvas></div>
+      </div>
+    </div>
+  
   </div>
 
   <!-- ═══════════════════════════════════ NETWORK DETAIL SECTION ═══════════════════════════ -->
@@ -489,6 +491,7 @@ const CROSS_DATA = [
 ];
 const CROSS_PRODUCTS  = [...new Set(CROSS_DATA.map(d=>d.product))];
 const CROSS_COUNTRIES = [...new Set(CROSS_DATA.map(d=>d.country))];
+let _activeCrossData = [...CROSS_DATA];
 
 let currentProducts = DEMO_PRODUCTS;
 let mktCBData = [], mktOVData = [];
@@ -944,11 +947,15 @@ function setCrossMode(mode,btn){crossMode=mode;crossSelected=null;document.query
 function renderCross(){const el=document.getElementById('crossContent');if(crossMode==='heatmap')renderHeatmap(el);else if(crossMode==='by-country')renderByCountry(el);else renderByProduct(el);}
 
 function renderHeatmap(el){
-  const maxConv=Math.max(...CROSS_DATA.map(d=>d.conv));
-  const lookup={};CROSS_DATA.forEach(d=>{lookup[`${d.product}||${d.country}`]=d;});
-  let html=`<div class="heatmap-wrap"><table class="heatmap-table"><thead><tr><th>Produto</th>${CROSS_COUNTRIES.map(c=>`<th class="country-header">${c}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>`;
-  CROSS_PRODUCTS.forEach(p=>{
-    const rowData=CROSS_COUNTRIES.map(c=>lookup[`${p}||${c}`]||null);
+  const data=_activeCrossData;
+  const prods=[...new Set(data.map(d=>d.product))];
+  const countries=[...new Set(data.map(d=>d.country))];
+  const maxConv=data.length?Math.max(...data.map(d=>d.conv)):1;
+  const lookup={};data.forEach(d=>{lookup[`${d.product}||${d.country}`]=d;});
+  if(!data.length){el.innerHTML='<div class="loading-state">Sem dados para o filtro selecionado</div>';return;}
+  let html=`<div class="heatmap-wrap"><table class="heatmap-table"><thead><tr><th>Produto</th>${countries.map(c=>`<th class="country-header">${c}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>`;
+  prods.forEach(p=>{
+    const rowData=countries.map(c=>lookup[`${p}||${c}`]||null);
     const rowTotal=rowData.reduce((s,d)=>s+(d?d.conv:0),0);
     html+=`<tr><td><div class="hm-product-cell">${p}</div></td>${rowData.map(d=>{
       if(!d)return`<td><div class="hm-cell" style="background:rgba(42,47,69,.3)"><span style="font-size:11px;color:#3a4060">-</span></div></td>`;
@@ -960,19 +967,23 @@ function renderHeatmap(el){
   el.innerHTML=html;
 }
 function renderByCountry(el){
-  const totals={};CROSS_DATA.forEach(d=>{if(!totals[d.country])totals[d.country]={conv:0,comm:0};totals[d.country].conv+=d.conv;totals[d.country].comm+=d.comm;});
+  const data=_activeCrossData;
+  if(!data.length){el.innerHTML='<div class="loading-state">Sem dados para o filtro selecionado</div>';return;}
+  const totals={};data.forEach(d=>{if(!totals[d.country])totals[d.country]={conv:0,comm:0};totals[d.country].conv+=d.conv;totals[d.country].comm+=d.comm;});
   const sorted=Object.entries(totals).sort((a,b)=>b[1].comm-a[1].comm);
   const sel=crossSelected||sorted[0][0];
-  const detailData=CROSS_DATA.filter(d=>d.country===sel).sort((a,b)=>b.conv-a.conv);
+  const detailData=data.filter(d=>d.country===sel).sort((a,b)=>b.conv-a.conv);
   const maxConv=Math.max(...detailData.map(d=>d.conv));
   const colors=['#6c63ff','#00d4aa','#ffa940','#ff6b6b','#a78bfa'];
   el.innerHTML=`<div class="cross-inner"><div class="cross-list">${sorted.map(([country,t])=>`<div class="cross-list-item ${country===sel?'selected':''}" onclick="selectCross('${country}','by-country')"><div class="cross-list-icon">${country.slice(0,2)}</div><div class="cross-list-label">${country}</div><div class="cross-list-val">${t.conv}</div></div>`).join('')}</div><div class="cross-detail"><div class="cross-detail-title">Top produtos em <span>${sel}</span></div>${detailData.map((d,i)=>`<div class="cross-bar-row"><div class="cross-bar-rank">${i+1}</div><div class="cross-bar-name">${d.product}</div><div class="cross-bar-track"><div class="cross-bar-fill" style="width:${Math.round((d.conv/maxConv)*100)}%;background:${colors[i%colors.length]}"></div></div><div class="cross-bar-val">${d.conv}<span class="cross-bar-sub">$${d.comm}</span></div></div>`).join('')}</div></div>`;
 }
 function renderByProduct(el){
-  const totals={};CROSS_DATA.forEach(d=>{if(!totals[d.product])totals[d.product]={conv:0,comm:0};totals[d.product].conv+=d.conv;totals[d.product].comm+=d.comm;});
+  const data=_activeCrossData;
+  if(!data.length){el.innerHTML='<div class="loading-state">Sem dados para o filtro selecionado</div>';return;}
+  const totals={};data.forEach(d=>{if(!totals[d.product])totals[d.product]={conv:0,comm:0};totals[d.product].conv+=d.conv;totals[d.product].comm+=d.comm;});
   const sorted=Object.entries(totals).sort((a,b)=>b[1].conv-a[1].conv);
   const sel=crossSelected||sorted[0][0];
-  const detailData=CROSS_DATA.filter(d=>d.product===sel).sort((a,b)=>b.conv-a.conv);
+  const detailData=data.filter(d=>d.product===sel).sort((a,b)=>b.conv-a.conv);
   const maxConv=Math.max(...detailData.map(d=>d.conv));
   const colors=['#6c63ff','#00d4aa','#ffa940','#ff6b6b','#a78bfa'];
   el.innerHTML=`<div class="cross-inner"><div class="cross-list">${sorted.map(([prod,t])=>`<div class="cross-list-item ${prod===sel?'selected':''}" onclick="selectCross('${prod}','by-product')"><div class="cross-list-icon">P</div><div class="cross-list-label">${prod}</div><div class="cross-list-val">${t.conv}</div></div>`).join('')}</div><div class="cross-detail"><div class="cross-detail-title">Top paises para <span>${sel}</span></div>${detailData.map((d,i)=>`<div class="cross-bar-row"><div class="cross-bar-rank">${i+1}</div><div class="cross-bar-name">${d.country}</div><div class="cross-bar-track"><div class="cross-bar-fill" style="width:${Math.round((d.conv/maxConv)*100)}%;background:${colors[i%colors.length]}"></div></div><div class="cross-bar-val">${d.conv}<span class="cross-bar-sub">$${d.comm}</span></div></div>`).join('')}</div></div>`;
@@ -1084,10 +1095,35 @@ function getFilteredProducts(data) {
 
 function applyNetFilter() {
   const sub = document.querySelector('#sec-performance .subtitle');
-  if (sub) sub.textContent = _activeNets.size === 0
-    ? 'Todas as redes · Atualizado agora'
-    : [..._activeNets].join(', ') + ' · Filtrado';
-  _origRenderProducts(getFilteredProducts(_currentProducts));
+  const label = _activeNets.size === 0 ? 'Todas as redes · Atualizado agora' : [..._activeNets].join(', ') + ' · Filtrado';
+  if (sub) sub.textContent = label;
+
+  const filteredProds = getFilteredProducts(_currentProducts);
+
+  // Filter vendors by active networks
+  const filteredVendors = _activeNets.size === 0
+    ? DEMO_VENDORS
+    : DEMO_VENDORS.filter(v => _activeNets.has(v.net));
+
+  // Derive geos from filtered products
+  const flagMap = { USA:'🇺🇸', UK:'🇬🇧', Canada:'🇨🇦', AUS:'🇦🇺', NZ:'🇳🇿', Ireland:'🇮🇪' };
+  const countryMap = {};
+  filteredProds.forEach(p => { countryMap[p.country] = (countryMap[p.country]||0) + p.comm; });
+  const sortedC = Object.entries(countryMap).sort((a,b)=>b[1]-a[1]);
+  const filteredGeos = sortedC.length
+    ? sortedC.map(([name,val],i,arr)=>({ flag:flagMap[name]||'🌐', name, pct:Math.round((val/arr[0][1])*100), val:'$'+val.toLocaleString() }))
+    : GEOS;
+
+  renderLeaderboards(filteredVendors, filteredProds, filteredGeos);
+
+  // Filter cross data to products in this network
+  _activeCrossData = _activeNets.size === 0
+    ? [...CROSS_DATA]
+    : CROSS_DATA.filter(c => filteredProds.some(p => p.name === c.product));
+  crossSelected = null;
+  renderCross();
+
+  _origRenderProducts(filteredProds);
   setTimeout(checkRoiAlerts, 50);
 }
 
@@ -1100,6 +1136,24 @@ function renderAndCheck(data){
 function openModal(){document.getElementById('modalBg').classList.add('open');}
 function closeModal(){document.getElementById('modalBg').classList.remove('open');}
 function addNetwork(){const name=document.getElementById('newNetName').value.trim();if(!name)return;const cols=['#e879f9','#38bdf8','#4ade80','#fb7185'];NETWORKS.push({name,color:cols[NETWORKS.length%cols.length],icon:name.slice(0,2).toUpperCase(),rev:0,roi:0,status:'active'});renderNetworks();renderNetworkCompare();buildNetFilterBar();closeModal();}
+
+function toggleNetFromSidebar(name) {
+  // Show dashboard if not visible
+  const perf = document.getElementById('sec-performance');
+  if (!perf.classList.contains('visible')) {
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('visible'));
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    perf.classList.add('visible');
+    document.querySelector('.nav-item').classList.add('active');
+  }
+  // Toggle the filter pill for this network
+  const pill = document.querySelector(`#netFilterBar [data-net="${name}"]`);
+  if (pill) toggleNetPill(pill, name);
+  // Highlight sidebar item
+  document.querySelectorAll('.network-item').forEach(el=>{
+    el.classList.toggle('active-net', _activeNets.has(el.querySelector('.net-name')?.textContent?.trim()));
+  });
+}
 
 // ── INIT ─────────────────────────────────────────────────────
 initDatePicker();
