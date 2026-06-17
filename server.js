@@ -266,6 +266,70 @@ app.get('/api/market/buygoods', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/market/audit — agrega Clickbank + Buygoods para auditoria de oportunidades
+app.get('/api/market/audit', async (req, res) => {
+  try {
+    const category = req.query.category || 'health';
+    const network  = req.query.network  || 'all';
+
+    const [cbRes, bgRes] = await Promise.allSettled([
+      publicData.getClickbankTopProducts(category, 50),
+      publicData.getBuygoodsMarketplace(30),
+    ]);
+
+    const parseComm = s => parseFloat(String(s || '0').replace(/[^0-9.]/g, '')) || 0;
+
+    let products = [];
+
+    if (cbRes.status === 'fulfilled' && (network === 'all' || network === 'clickbank')) {
+      (cbRes.value.products || []).forEach(p => products.push({
+        name:       p.name,
+        network:    'Clickbank',
+        category:   p.category || category,
+        commission: parseComm(p.initComm) || parseComm(p.avgComm),
+        avgComm:    p.avgComm || '',
+        gravity:    p.gravity || 0,
+        vendor:     p.vendor || '',
+        geos:       'US,CA,GB,AU',
+        status:     p.gravity > 200 ? 'hot' : p.gravity > 80 ? 'scaling' : 'stable',
+      }));
+    }
+
+    if (bgRes.status === 'fulfilled' && (network === 'all' || network === 'buygoods')) {
+      (bgRes.value.products || bgRes.value.offers || []).forEach(p => {
+        const name = p.name || p.title || p.product_name;
+        if (!name) return;
+        products.push({
+          name,
+          network:    'Buygoods',
+          category:   p.category || 'Health',
+          commission: parseComm(p.payout || p.commission || p.price),
+          avgComm:    '',
+          gravity:    0,
+          vendor:     '',
+          geos:       'US,CA,GB,AU',
+          status:     (p.badge || '').toLowerCase().includes('best') ? 'hot' : 'stable',
+        });
+      });
+    }
+
+    products = products
+      .filter(p => p.name && p.name.length > 1)
+      .sort((a, b) => (b.commission - a.commission) || (b.gravity - a.gravity));
+
+    const bestComm    = products.length ? Math.max(...products.map(p => p.commission)) : 0;
+    const bestGravity = products.filter(p => p.gravity > 0).reduce((m, p) => Math.max(m, p.gravity), 0);
+    const topCategory = [...new Set(products.map(p => p.category).filter(Boolean))][0] || category;
+
+    res.json({
+      summary: { total: products.length, bestCommission: bestComm, bestGravity, topCategory },
+      products,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/market/network/:name — ofertas públicas de uma rede específica via OfferVault
 app.get('/api/market/network/:name', async (req, res) => {
   try { res.json(await publicData.getOffersByNetwork(req.params.name, req.query.keyword || 'health')); }
