@@ -372,8 +372,42 @@
         <thead><tr><th>#</th><th>Produto</th><th>Pais Top</th><th>CPC</th><th>Conversoes</th><th>Comissao</th><th>ROI</th><th>Status</th></tr></thead>
         <tbody id="net-detail-products"></tbody>
       </table>
-      <div id="net-detail-empty" class="loading-state" style="display:none">Nenhum produto encontrado para esta rede nos dados de demonstracao.</div>
+      <div id="net-detail-empty" class="loading-state" style="display:none">Nenhum produto encontrado para esta rede.</div>
     </div>
+
+    <!-- Leaderboards filtrados pela rede -->
+    <div class="leaderboard-grid" style="margin-top:24px">
+      <div class="lb-card">
+        <div class="lb-header"><div class="lb-icon" style="background:rgba(108,99,255,.15)">Prod</div><div><div class="lb-title">Top Produtores</div><div class="lb-sub">Por comissao gerada</div></div></div>
+        <div id="net-lbVendors"></div>
+      </div>
+      <div class="lb-card">
+        <div class="lb-header"><div class="lb-icon" style="background:rgba(0,212,170,.15)">Item</div><div><div class="lb-title">Produtos Mais Vendidos</div><div class="lb-sub">Por volume de conversoes</div></div></div>
+        <div id="net-lbProducts"></div>
+      </div>
+      <div class="lb-card">
+        <div class="lb-header"><div class="lb-icon" style="background:rgba(255,169,64,.15)">Geo</div><div><div class="lb-title">Paises Que Mais Compram</div><div class="lb-sub">Por receita gerada</div></div></div>
+        <div id="net-lbCountries"></div>
+      </div>
+    </div>
+
+    <!-- Cruzamento Produto x Pais -->
+    <div class="chart-card cross-section" style="margin-top:24px">
+      <div style="margin-bottom:14px">
+        <div class="chart-title">Cruzamento Produto x Pais</div>
+        <div class="chart-subtitle">Conversoes e comissoes por produto e regiao</div>
+      </div>
+      <div id="net-cross-table"></div>
+    </div>
+
+    <!-- Produtos Mais Escalados -->
+    <div class="table-card" style="margin-top:24px">
+      <div class="table-header">
+        <div><div class="chart-title">Produtos Mais Escalados</div><div class="chart-subtitle">Hot e Scaling com maior ROI</div></div>
+      </div>
+      <div id="net-scaling"></div>
+    </div>
+
   </div><!-- end sec-network -->
 
 </main>
@@ -753,6 +787,86 @@ function selectNetwork(el, idx){
         <td style="color:var(--green);font-weight:600">${p.roi}%</td><td>${tag}</td></tr>`;
     }).join('');
   }
+  // ── Leaderboards filtrados pela rede ───────────────────────
+  const netVendors = DEMO_VENDORS.filter(v => v.net.toLowerCase() === n.name.toLowerCase());
+  const maxComm = netVendors.length ? Math.max(...netVendors.map(v=>v.comm)) : 1;
+  const maxConv = prods.length ? Math.max(...prods.map(p=>p.conv)) : 1;
+
+  document.getElementById('net-lbVendors').innerHTML = netVendors.length
+    ? netVendors.map((v,i)=>`<div class="lb-row">
+        <div class="lb-pos ${posClass(i)}">${i+1}</div>
+        <div class="lb-avatar" style="background:${v.color}22;color:${v.color}">${v.avatar}</div>
+        <div class="lb-info">
+          <div class="lb-name">${v.name}</div>
+          <div class="lb-detail">${v.niche}</div>
+          <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((v.comm/maxComm)*100)}%;background:${v.color}"></div></div>
+        </div>
+        <div class="lb-value">$${v.comm.toLocaleString()}<span class="lb-change">${v.conv} conv.</span></div>
+      </div>`).join('')
+    : '<div class="loading-state">Sem produtores para esta rede</div>';
+
+  document.getElementById('net-lbProducts').innerHTML = prods.length
+    ? [...prods].sort((a,b)=>b.conv-a.conv).map((p,i)=>`<div class="lb-row">
+        <div class="lb-pos ${posClass(i)}">${i+1}</div>
+        <div class="lb-info">
+          <div class="lb-name">${p.name}</div>
+          <div class="lb-detail">CPC $${Number(p.cpc).toFixed(2)}</div>
+          <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((p.conv/maxConv)*100)}%"></div></div>
+        </div>
+        <div class="lb-value">${Number(p.conv).toLocaleString()}<span class="lb-change">$${Number(p.comm).toLocaleString()}</span></div>
+      </div>`).join('')
+    : '<div class="loading-state">Sem produtos para esta rede</div>';
+
+  // Países agrupados por produto desta rede
+  const netCountries = {};
+  prods.forEach(p => { netCountries[p.country] = (netCountries[p.country]||0) + p.comm; });
+  const sortedC = Object.entries(netCountries).sort((a,b)=>b[1]-a[1]);
+  const maxGeo = sortedC.length ? sortedC[0][1] : 1;
+  const flagMap = { USA:'🇺🇸', UK:'🇬🇧', Canada:'🇨🇦', AUS:'🇦🇺', NZ:'🇳🇿', Ireland:'🇮🇪' };
+  document.getElementById('net-lbCountries').innerHTML = sortedC.length
+    ? sortedC.map(([country, val], i)=>`<div class="lb-row">
+        <div class="lb-pos ${posClass(i)}">${i+1}</div>
+        <div style="font-size:16px;flex-shrink:0;width:24px">${flagMap[country]||'🌐'}</div>
+        <div class="lb-info">
+          <div class="lb-name">${country}</div>
+          <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((val/maxGeo)*100)}%;background:var(--accent2)"></div></div>
+        </div>
+        <div class="lb-value" style="color:var(--accent2)">$${val.toLocaleString()}</div>
+      </div>`).join('')
+    : '<div class="loading-state">Sem dados de paises para esta rede</div>';
+
+  // ── Cruzamento Produto x Pais ───────────────────────────────
+  const netCross = CROSS_DATA.filter(c => prods.some(p => p.name === c.product));
+  const crossMax = netCross.length ? Math.max(...netCross.map(c=>c.comm)) : 1;
+  document.getElementById('net-cross-table').innerHTML = netCross.length
+    ? `<table style="width:100%"><thead><tr><th>Produto</th><th>Pais</th><th>Conversoes</th><th>Comissao</th><th>CPC</th></tr></thead><tbody>`
+      + netCross.sort((a,b)=>b.comm-a.comm).map(c=>{
+          const bw = Math.round((c.comm/crossMax)*80);
+          return `<tr>
+            <td><div class="product-name">${c.product}</div></td>
+            <td>${c.country}</td>
+            <td>${c.conv}</td>
+            <td><div class="bar-wrap"><div class="mini-bar" style="width:${bw}px;background:var(--accent)"></div><span>$${c.comm.toLocaleString()}</span></div></td>
+            <td>$${Number(c.cpc).toFixed(2)}</td>
+          </tr>`;
+        }).join('')
+      + '</tbody></table>'
+    : '<div class="loading-state">Sem dados de cruzamento para esta rede</div>';
+
+  // ── Produtos Mais Escalados ─────────────────────────────────
+  const scaling = prods.filter(p=>p.status==='scaling'||p.status==='hot').sort((a,b)=>b.roi-a.roi);
+  document.getElementById('net-scaling').innerHTML = scaling.length
+    ? `<table style="width:100%"><thead><tr><th>#</th><th>Produto</th><th>Pais</th><th>Conversoes</th><th>Comissao</th><th>ROI</th><th>Status</th></tr></thead><tbody>`
+      + scaling.map((p,i)=>{
+          const tag = p.status==='hot'?'<span class="tag tag-green">Hot</span>':'<span class="tag tag-purple">Scaling</span>';
+          return `<tr><td class="rank">${i+1}</td><td><div class="product-name">${p.name}</div></td>
+            <td>${p.country}</td><td>${p.conv}</td>
+            <td>$${Number(p.comm).toLocaleString()}</td>
+            <td style="color:var(--green);font-weight:600">${p.roi}%</td><td>${tag}</td></tr>`;
+        }).join('')
+      + '</tbody></table>'
+    : '<div class="loading-state">Nenhum produto em escala para esta rede</div>';
+
   // Switch section
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('visible'));
   document.querySelectorAll('.nav-item').forEach(ni=>ni.classList.remove('active'));
@@ -889,9 +1003,12 @@ function checkRoiAlerts(){
 let autoRefreshInterval=null,autoRefreshSeconds=0,autoRefreshTimer=null;
 const REFRESH_EVERY=5*60;
 function toggleAutoRefresh(){
-  const btn=document.getElementById('autoRefreshBtn');const dot=document.getElementById('refreshDot');const countdown=document.getElementById('refreshCountdown');
-  if(autoRefreshInterval){clearInterval(autoRefreshInterval);clearInterval(autoRefreshTimer);autoRefreshInterval=null;btn.textContent='Auto-refresh: OFF';btn.classList.remove('active');dot.style.display='none';countdown.textContent='';}
-  else{btn.textContent='Auto-refresh: ON (5min)';btn.classList.add('active');dot.style.display='block';autoRefreshSeconds=REFRESH_EVERY;updateCountdown();autoRefreshTimer=setInterval(()=>{autoRefreshSeconds--;updateCountdown();if(autoRefreshSeconds<=0)autoRefreshSeconds=REFRESH_EVERY;},1000);autoRefreshInterval=setInterval(()=>{autoRefreshSeconds=REFRESH_EVERY;loadFromBackend(30);},REFRESH_EVERY*1000);}
+  const btn=document.getElementById('autoRefreshBtn');const dot=document.getElementById('refreshDot');
+  if(autoRefreshInterval){clearInterval(autoRefreshInterval);clearInterval(autoRefreshTimer);autoRefreshInterval=null;btn.textContent='Auto-refresh: OFF';dot.style.display='none';return;}
+  autoRefreshSeconds=REFRESH_EVERY;
+  updateCountdown();dot.style.display='inline-block';btn.textContent='Auto-refresh: ON';
+  autoRefreshInterval=setInterval(()=>{loadFromBackend(30);autoRefreshSeconds=REFRESH_EVERY;},REFRESH_EVERY*1000);
+  autoRefreshTimer=setInterval(()=>{autoRefreshSeconds--;updateCountdown();},1000);
 }
 function updateCountdown(){const el=document.getElementById('refreshCountdown');const m=Math.floor(autoRefreshSeconds/60);const s=autoRefreshSeconds%60;el.textContent=`proximo em ${m}:${String(s).padStart(2,'0')}`;}
 function setPeriod(btn,days){document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadFromBackend(days);}
@@ -906,7 +1023,7 @@ async function loadFromBackend(days=30,fromDate=null,toDate=null){
     const all=await(await fetch(url)).json();
     showBanner('ok',status.networks,all.summary);
     if(all.summary){document.getElementById('kpiComm').textContent='$'+Number(all.summary.totalCommission).toLocaleString('en-US',{maximumFractionDigits:0});document.getElementById('kpiConv').textContent=Number(all.summary.totalConversions).toLocaleString();}
-    if(status.networks){NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
+    if(status.networks){window._netStatus=status.networks;NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
     if(all.topProducts?.length){renderAndCheck(all.topProducts.map(p=>({name:p.name,net:p.network,country:'Global',cpc:0,conv:p.conversions,comm:p.commission,roi:0,status:p.commission>2000?'hot':p.commission>500?'scaling':'stable'})));}
     if(all.networks){const real=all.networks.filter(n=>n.status==='ok'&&n.data).map(n=>({name:n.source,color:NETWORKS.find(x=>x.name.toLowerCase()===n.source.toLowerCase())?.color||'#6c63ff',rev:parseFloat(n.data.totalCommission)||0}));if(real.length)renderNetworkCompare(real);}
   }catch{showBanner('demo');}
@@ -914,11 +1031,12 @@ async function loadFromBackend(days=30,fromDate=null,toDate=null){
 function showBanner(type,networks,summary){
   const el=document.getElementById('connBanner');if(el)el.remove();
   const b=document.createElement('div');b.id='connBanner';
-  if(type==='ok'){const ok=Object.values(networks).filter(Boolean).length,tot=Object.keys(networks).length;b.style.cssText='background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#00d4aa;display:flex;align-items:center;gap:8px';b.innerHTML=`OK <strong>Backend conectado</strong> - ${ok}/${tot} redes configuradas - ${summary?.networksError||0} com erro`;}
+  if(type==='ok'){const ok=Object.values(networks).filter(Boolean).length,tot=Object.keys(networks).length;b.style.cssText='background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#00d4aa;display:flex;align-items:center;gap:8px';b.innerHTML=`<strong>Backend conectado</strong> - ${ok}/${tot} redes configuradas - ${summary?.networksError||0} com erro`;}
   else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo — Backend offline ou aguardando resposta. Dados reais indisponiveis no momento.';}
   document.querySelector('.topbar').after(b);
 }
-// ── NETWORK FILTER ────────// ── NETWORK FILTER ────────────────────────────────────────────
+
+// ── NETWORK FILTER ────────────────────────────────────────────
 let _currentProducts = [...DEMO_PRODUCTS];
 let _activeNets = new Set();
 
@@ -981,9 +1099,9 @@ function renderAndCheck(data){
 }
 function openModal(){document.getElementById('modalBg').classList.add('open');}
 function closeModal(){document.getElementById('modalBg').classList.remove('open');}
-function addNetwork(){const name=document.getElementById('newNetName').value.trim();if(!name)return;const cols=['#e879f9','#38bdf8','#4ade80','#fb7185'];NETWORKS.push({name,color:cols[NETWORKS.length%cols.length],icon:name.slice(0,2).toUpperCase(),rev:0,roi:0,status:'active'});renderNetworks();renderNetworkCompare();closeModal();}
+function addNetwork(){const name=document.getElementById('newNetName').value.trim();if(!name)return;const cols=['#e879f9','#38bdf8','#4ade80','#fb7185'];NETWORKS.push({name,color:cols[NETWORKS.length%cols.length],icon:name.slice(0,2).toUpperCase(),rev:0,roi:0,status:'active'});renderNetworks();renderNetworkCompare();buildNetFilterBar();closeModal();}
 
-// ── INIT ─────────────────────────────────────────────
+// ── INIT ─────────────────────────────────────────────────────
 initDatePicker();
 buildNetFilterBar();
 renderNetworks();
