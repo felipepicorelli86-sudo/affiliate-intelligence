@@ -220,6 +220,28 @@
   .mkt-badge-low{background:rgba(255,169,64,.15);color:var(--accent4);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
   .info-banner{background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.25);border-radius:10px;padding:12px 18px;margin-bottom:20px;font-size:12px;color:var(--text2);}
   .info-banner strong{color:var(--accent);}
+  /* ── PRODUCT CARDS ── */
+  .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;padding:4px 0;}
+  .prod-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;transition:border-color .15s,transform .15s,box-shadow .15s;cursor:pointer;}
+  .prod-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.25);}
+  .prod-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .prod-card-net{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;}
+  .prod-card-name{font-size:14px;font-weight:700;margin-bottom:3px;line-height:1.35;}
+  .prod-card-vendor{font-size:11px;color:var(--text2);margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .prod-card-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .prod-card-metric{background:var(--surface2);border-radius:8px;padding:8px 10px;}
+  .prod-card-metric.full{grid-column:span 2;}
+  .prod-card-metric-label{font-size:9px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;}
+  .prod-card-metric-val{font-size:17px;font-weight:800;}
+  .prod-card-geos{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+  .geo-chip{font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--surface2);color:var(--text2);}
+  .opp-ring{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;border:2px solid;}
+  .opp-high{background:rgba(0,212,170,.12);color:var(--green);border-color:rgba(0,212,170,.4);}
+  .opp-mid{background:rgba(108,99,255,.12);color:var(--accent);border-color:rgba(108,99,255,.4);}
+  .opp-low{background:rgba(255,169,64,.12);color:var(--accent4);border-color:rgba(255,169,64,.4);}
+  .sort-select{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12px;outline:none;cursor:pointer;color-scheme:dark;}
+  .sort-select:focus{border-color:var(--accent);}
+  .prod-count-badge{font-size:11px;color:var(--text2);padding:5px 12px;background:var(--surface2);border-radius:8px;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -272,11 +294,18 @@
     </div>
     <div class="table-card">
       <div class="table-header">
-        <div><div class="chart-title">Melhores Oportunidades de Mercado</div><div class="chart-subtitle">Ordenado por maior comissao disponivel</div></div>
-        <input class="search-input" placeholder="Buscar produto..." oninput="filterTable(this.value)">
+        <div><div class="chart-title">Garimpagem de Produtos</div><div class="chart-subtitle">Score de oportunidade = comissao alta + gravity gerenciavel</div></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="prod-count-badge" id="prodCountBadge">0 produtos</span>
+          <input class="search-input" placeholder="Buscar produto ou vendor..." oninput="filterTable(this.value)" style="width:200px">
+          <select class="sort-select" onchange="sortProducts(this.value)">
+            <option value="opp">Score Oportunidade</option>
+            <option value="comm">Maior Comissao</option>
+            <option value="gravity">Maior Gravity</option>
+          </select>
+        </div>
       </div>
-      <table><thead><tr><th>#</th><th>Produto / Rede</th><th>GEOs</th><th>Comissao</th><th>Gravity</th><th>Comm Media</th><th>Vendor</th><th>Status</th></tr></thead>
-      <tbody id="productsBody"></tbody></table>
+      <div id="productsBody" class="prod-grid"></div>
     </div>
     <div class="chart-card cross-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -808,29 +837,66 @@ function selectNetwork(el, idx){
   document.getElementById('sec-network').classList.add('visible');
 }
 
+function calcOppScore(comm,gravity){
+  // Alto score = comissao alta + gravity gerenciavel (nao saturado)
+  var commScore=Math.min(comm/120,1)*50;
+  var gravScore=gravity>0?(gravity<80?30:(gravity<200?20:10)):15;
+  var hiddenGem=gravity>0&&gravity<60&&comm>30?15:0;
+  return Math.min(Math.round(commScore+gravScore+hiddenGem),99);
+}
+let _currentSort='opp';
+function sortProducts(by){
+  _currentSort=by;
+  var sorted=[..._currentProducts].sort(function(a,b){
+    if(by==='gravity')return(b.conv||0)-(a.conv||0);
+    if(by==='opp')return calcOppScore(b.comm,b.conv)-calcOppScore(a.comm,a.conv);
+    return(b.comm||0)-(a.comm||0);
+  });
+  _origRenderProducts(sorted);
+}
 function renderProducts(data){
   currentProducts=data;
-  if(!data.length){document.getElementById('productsBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text2)">Carregando dados do mercado...</td></tr>';return;}
-  const maxC=Math.max(...data.map(p=>p.comm),1);
-  document.getElementById('productsBody').innerHTML=data.map((p,i)=>{
-    const bw=Math.round((p.comm/maxC)*80);
-    const tag=p.status==='hot'?'<span class="tag tag-green">Hot</span>':p.status==='scaling'?'<span class="tag tag-purple">Scaling</span>':'<span class="tag tag-orange">Stable</span>';
-    const netColor=NETWORKS.find(n=>n.name===p.net)?.color||'var(--accent)';
-    const geoDisplay=String(p.country||'US').split(',').slice(0,4).join(', ');
-    return `<tr>
-      <td class="rank">${i+1}</td>
-      <td><div class="product-name">${p.name}</div><div class="product-net" style="color:${netColor}">${p.net}</div></td>
-      <td style="font-size:11px;color:var(--text2)">${geoDisplay}</td>
-      <td><div class="bar-wrap"><div class="mini-bar" style="width:${bw}px;background:${netColor}"></div><span style="font-weight:700;color:var(--green)">$${Number(p.comm).toFixed(2)}</span></div></td>
-      <td style="color:var(--accent2);font-weight:600">${p.conv>0?p.conv:'—'}</td>
-      <td style="font-size:12px;color:var(--text2)">${p.cpc||'—'}</td>
-      <td style="font-size:11px;color:var(--text2);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.roi||'—'}</td>
-      <td>${tag}</td></tr>`;
+  var badge=document.getElementById('prodCountBadge');if(badge)badge.textContent=data.length+' produtos';
+  if(!data.length){
+    document.getElementById('productsBody').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text2);font-size:14px">Carregando dados do mercado...</div>';
+    return;
+  }
+  // Sort by current sort
+  var sorted=[...data].sort(function(a,b){
+    if(_currentSort==='gravity')return(b.conv||0)-(a.conv||0);
+    if(_currentSort==='opp')return calcOppScore(b.comm,b.conv)-calcOppScore(a.comm,a.conv);
+    return(b.comm||0)-(a.comm||0);
+  });
+  document.getElementById('productsBody').innerHTML=sorted.map(function(p,i){
+    var opp=calcOppScore(p.comm,p.conv);
+    var oppClass=opp>=65?'opp-high':opp>=40?'opp-mid':'opp-low';
+    var netColor=(NETWORKS.find(function(n){return n.name===p.net;})||{color:'#6c63ff'}).color;
+    var statusTag=p.status==='hot'?'<span class="tag tag-green">Hot</span>':p.status==='scaling'?'<span class="tag tag-purple">Scaling</span>':'<span class="tag tag-orange">Stable</span>';
+    var geos=String(p.country||'US,CA,GB,AU').split(',').slice(0,5).map(function(g){return'<span class="geo-chip">'+g.trim()+'</span>';}).join('');
+    var vendor=p.roi&&p.roi!=='--'?p.roi:(p.net+' Marketplace');
+    var commMedia=p.cpc&&p.cpc!=='--'?p.cpc:'N/A';
+    return '<div class="prod-card">'
+      +'<div class="prod-card-top">'
+      +'<span class="prod-card-net" style="background:'+netColor+'22;color:'+netColor+'">'+p.net+'</span>'
+      +'<div style="display:flex;align-items:center;gap:8px">'+statusTag+'<div class="opp-ring '+oppClass+'" title="Score de Oportunidade: '+opp+'">'+opp+'</div></div>'
+      +'</div>'
+      +'<div class="prod-card-name">'+p.name+'</div>'
+      +'<div class="prod-card-vendor">'+vendor+'</div>'
+      +'<div class="prod-card-metrics">'
+      +'<div class="prod-card-metric"><div class="prod-card-metric-label">Comissao</div><div class="prod-card-metric-val" style="color:var(--green)">$'+Number(p.comm).toFixed(2)+'</div></div>'
+      +'<div class="prod-card-metric"><div class="prod-card-metric-label">Gravity</div><div class="prod-card-metric-val" style="color:var(--accent2)">'+(p.conv>0?p.conv:'N/A')+'</div></div>'
+      +'<div class="prod-card-metric full"><div class="prod-card-metric-label">Comm Media / Conv</div><div class="prod-card-metric-val" style="font-size:13px;color:var(--text)">'+commMedia+'</div></div>'
+      +'</div>'
+      +'<div class="prod-card-geos">'+geos+'</div>'
+      +'</div>';
   }).join('');
 }
 function filterTable(q){
-  const f=_currentProducts.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||(p.net||'').toLowerCase().includes(q.toLowerCase()));
-  _origRenderProducts(f.length?f:_currentProducts);
+  var lower=q.toLowerCase();
+  var f=_currentProducts.filter(function(p){
+    return p.name.toLowerCase().includes(lower)||(p.net||'').toLowerCase().includes(lower)||(p.roi||'').toLowerCase().includes(lower);
+  });
+  _origRenderProducts(f.length||!q?f:_currentProducts);
 }
 
 function renderNetworkCompare(nets){
