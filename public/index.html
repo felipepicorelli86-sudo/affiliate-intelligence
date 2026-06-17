@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Affiliate Hub — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:#0d0f17; --surface:#161a27; --surface2:#1e2235; --border:#2a2f45;
+    --accent:#6c63ff; --accent2:#00d4aa; --accent3:#ff6b6b; --accent4:#ffa940;
+    --text:#e8eaf6; --text2:#8892b0; --green:#00d4aa; --red:#ff6b6b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  .sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0;position:fixed;top:0;left:0;height:100vh;z-index:100;}
+  .logo{padding:20px 18px;border-bottom:1px solid var(--border);}
+  .logo h1{font-size:16px;font-weight:700;color:var(--accent);letter-spacing:.5px;}
+  .logo p{font-size:11px;color:var(--text2);margin-top:2px;}
+  .nav-section{padding:16px 12px 8px;font-size:10px;font-weight:600;color:var(--text2);letter-spacing:1px;text-transform:uppercase;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 18px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;border-left:3px solid transparent;}
+  .nav-item:hover{color:var(--text);background:var(--surface2);}
+  .nav-item.active{color:var(--accent);background:rgba(108,99,255,.08);border-left-color:var(--accent);}
+  .networks-list{padding:0 12px;overflow-y:auto;flex:1;}
+  .network-item{display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-radius:6px;cursor:pointer;transition:background .15s;margin-bottom:2px;}
+  .network-item:hover{background:var(--surface2);}
+  .network-item.active-net{background:rgba(108,99,255,.1);}
+  .net-left{display:flex;align-items:center;gap:8px;}
+  .net-icon{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+  .net-name{font-size:12px;font-weight:500;}
+  .net-badge{font-size:10px;padding:2px 6px;border-radius:10px;font-weight:600;}
+  .badge-green{background:rgba(0,212,170,.15);color:var(--green);}
+  .badge-orange{background:rgba(255,169,64,.15);color:var(--accent4);}
+  .main{margin-left:220px;flex:1;padding:28px;min-height:100vh;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
+  .topbar h2{font-size:22px;font-weight:700;}
+  .topbar .subtitle{font-size:13px;color:var(--text2);margin-top:3px;}
+  .period-selector{display:flex;gap:4px;}
+  .period-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:12px;transition:all .15s;}
+  .period-btn.active,.period-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .kpi-card.k1::before{background:linear-gradient(90deg,#6c63ff,#a78bfa);}
+  .kpi-card.k2::before{background:linear-gradient(90deg,#00d4aa,#34d399);}
+  .kpi-card.k3::before{background:linear-gradient(90deg,#ff6b6b,#f87171);}
+  .kpi-card.k4::before{background:linear-gradient(90deg,#ffa940,#fb923c);}
+  .kpi-label{font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+  .kpi-value{font-size:26px;font-weight:700;margin-bottom:6px;}
+  .kpi-change{font-size:12px;display:flex;align-items:center;gap:4px;}
+  .kpi-change.up{color:var(--green);}
+  .kpi-change.down{color:var(--red);}
+  .charts-grid{display:grid;grid-template-columns:2fr 1.2fr;gap:16px;margin-bottom:20px;}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
+  .chart-title{font-size:14px;font-weight:600;margin-bottom:4px;}
+  .chart-subtitle{font-size:12px;color:var(--text2);margin-bottom:16px;}
+  .table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;}
+  .table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+  .search-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-size:13px;width:220px;outline:none;}
+  .search-input:focus{border-color:var(--accent);}
+  table{width:100%;border-collapse:collapse;}
+  thead th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
+  tbody tr{border-bottom:1px solid rgba(42,47,69,.5);transition:background .12s;}
+  tbody tr:hover{background:var(--surface2);}
+  tbody td{padding:11px 12px;font-size:13px;}
+  .rank{color:var(--text2);font-weight:600;width:36px;}
+  .product-name{font-weight:500;}
+  .product-net{font-size:11px;color:var(--text2);margin-top:2px;}
+  .bar-wrap{display:flex;align-items:center;gap:8px;}
+  .mini-bar{height:6px;border-radius:3px;background:var(--accent);opacity:.8;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+  .tag-green{background:rgba(0,212,170,.15);color:var(--green);}
+  .tag-purple{background:rgba(108,99,255,.15);color:var(--accent);}
+  .tag-orange{background:rgba(255,169,64,.15);color:var(--accent4);}
+  .bottom-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;}
+  .net-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(42,47,69,.4);}
+  .net-row:last-child{border-bottom:none;}
+  .net-row-name{width:110px;font-size:12px;font-weight:500;flex-shrink:0;}
+  .net-bar-track{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;}
+  .net-bar-fill{height:100%;border-radius:4px;}
+  .net-row-val{font-size:12px;font-weight:600;width:70px;text-align:right;flex-shrink:0;}
+  .geo-row{display:flex;align-items:center;gap:10px;padding:7px 0;}
+  .geo-flag{font-size:18px;width:28px;}
+  .geo-name{font-size:13px;font-weight:500;flex:1;}
+  .geo-bar-wrap{width:100px;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+  .geo-bar{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent2),var(--accent));}
+  .geo-val{font-size:12px;font-weight:600;color:var(--green);width:60px;text-align:right;}
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:420px;}
+  .modal h3{font-size:16px;font-weight:700;margin-bottom:6px;}
+  .modal p{font-size:13px;color:var(--text2);margin-bottom:20px;}
+  .form-group{margin-bottom:14px;}
+  .form-label{font-size:12px;color:var(--text2);margin-bottom:5px;display:block;}
+  .form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;}
+  .form-input:focus{border-color:var(--accent);}
+  .modal-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+  .btn{padding:9px 20px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:#5a52e0;}
+  .btn-ghost{background:var(--surface2);color:var(--text2);}
+  .btn-ghost:hover{color:var(--text);}
+  .add-net-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;margin:12px;border-radius:8px;border:1px dashed var(--border);color:var(--text2);cursor:pointer;font-size:12px;transition:all .15s;background:none;width:calc(100% - 24px);}
+  .add-net-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .cross-section{margin-bottom:20px;}
+  .cross-tabs{display:flex;gap:4px;margin-bottom:16px;}
+  .cross-tab{padding:7px 18px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;}
+  .cross-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .cross-inner{display:grid;grid-template-columns:200px 1fr;gap:16px;}
+  .cross-list{display:flex;flex-direction:column;gap:4px;max-height:340px;overflow-y:auto;}
+  .cross-list-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s;border:1px solid transparent;}
+  .cross-list-item:hover{background:var(--surface2);}
+  .cross-list-item.selected{background:rgba(108,99,255,.12);border-color:var(--accent);}
+  .cross-list-icon{font-size:16px;width:22px;flex-shrink:0;}
+  .cross-list-label{font-size:12px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cross-list-val{font-size:11px;color:var(--text2);flex-shrink:0;}
+  .cross-detail{background:var(--surface2);border-radius:10px;padding:16px;}
+  .cross-detail-title{font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text2);}
+  .cross-detail-title span{color:var(--text);}
+  .cross-bar-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(42,47,69,.4);}
+  .cross-bar-row:last-child{border-bottom:none;}
+  .cross-bar-rank{width:18px;font-size:11px;color:var(--text2);font-weight:600;flex-shrink:0;}
+  .cross-bar-name{font-size:12px;font-weight:500;width:130px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cross-bar-track{flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden;}
+  .cross-bar-fill{height:100%;border-radius:4px;transition:width .4s ease;}
+  .cross-bar-val{font-size:12px;font-weight:600;color:var(--green);width:65px;text-align:right;flex-shrink:0;}
+  .cross-bar-sub{font-size:10px;color:var(--text2);display:block;}
+  .heatmap-wrap{overflow-x:auto;}
+  .heatmap-table{border-collapse:collapse;width:100%;min-width:600px;}
+  .heatmap-table th{font-size:11px;color:var(--text2);padding:6px 10px;text-align:left;font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap;}
+  .heatmap-table th.country-header{text-align:center;}
+  .heatmap-table td{padding:8px 10px;font-size:12px;border-bottom:1px solid rgba(42,47,69,.3);}
+  .heatmap-table tr:last-child td{border-bottom:none;}
+  .hm-cell{display:flex;align-items:center;justify-content:center;flex-direction:column;border-radius:6px;padding:5px 8px;min-width:64px;cursor:pointer;transition:filter .15s;}
+  .hm-cell:hover{filter:brightness(1.3);}
+  .hm-conv{font-size:12px;font-weight:700;}
+  .hm-comm{font-size:10px;opacity:.8;}
+  .hm-product-cell{font-size:12px;font-weight:500;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;}
+  .hm-product-sub{font-size:10px;color:var(--text2);}
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+  .toolbar-label{font-size:12px;color:var(--text2);font-weight:500;}
+  .date-input{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;cursor:pointer;color-scheme:dark;}
+  .date-input:focus{border-color:var(--accent);}
+  .toolbar-sep{color:var(--border);font-size:18px;}
+  .toolbar-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;}
+  .toolbar-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .toolbar-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .toolbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .auto-refresh-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .refresh-countdown{font-size:11px;color:var(--text2);}
+  .roi-alert{color:var(--red)!important;}
+  .roi-alert-row{background:rgba(255,107,107,.05)!important;}
+  .roi-alert-row:hover{background:rgba(255,107,107,.1)!important;}
+  .alert-panel{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.25);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:none;}
+  .alert-panel.visible{display:block;}
+  .alert-panel-title{font-size:13px;font-weight:600;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .alert-item{font-size:12px;color:var(--text2);padding:3px 0;display:flex;gap:8px;}
+  .alert-item strong{color:var(--text);}
+  .roi-control{display:flex;align-items:center;gap:8px;}
+  .roi-input{width:70px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;outline:none;text-align:center;}
+  .roi-input:focus{border-color:var(--red);}
+  .leaderboard-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;}
+  .lb-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
+  .lb-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  .lb-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .lb-title{font-size:14px;font-weight:600;}
+  .lb-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+  .lb-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(42,47,69,.4);}
+  .lb-row:last-child{border-bottom:none;}
+  .lb-pos{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+  .lb-pos-1{background:rgba(255,195,0,.2);color:#ffc300;}
+  .lb-pos-2{background:rgba(192,192,192,.2);color:#c0c0c0;}
+  .lb-pos-3{background:rgba(205,127,50,.2);color:#cd7f32;}
+  .lb-pos-n{background:var(--surface2);color:var(--text2);}
+  .lb-info{flex:1;min-width:0;}
+  .lb-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lb-detail{font-size:11px;color:var(--text2);margin-top:1px;}
+  .lb-value{font-size:13px;font-weight:700;color:var(--green);flex-shrink:0;text-align:right;}
+  .lb-change{font-size:10px;color:var(--green);display:block;}
+  .lb-bar-bg{height:3px;background:var(--surface2);border-radius:2px;margin-top:5px;}
+  .lb-bar{height:3px;border-radius:2px;background:var(--accent);}
+  .lb-avatar{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+  /* ── MARKET SECTION ────────────────────────────────────────── */
+  .section{display:none;}
+  .section.visible{display:block;}
+  .market-tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;}
+  .mkt-tab{padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;}
+  .mkt-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .mkt-panel{display:none;}
+  .mkt-panel.visible{display:block;}
+  .gravity-bar{height:6px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:6px;}
+  .mkt-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .mkt-stat{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .mkt-stat-label{font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+  .mkt-stat-value{font-size:22px;font-weight:700;color:var(--accent2);}
+  .mkt-stat-sub{font-size:11px;color:var(--text2);margin-top:3px;}
+  .trend-bar-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(42,47,69,.3);}
+  .trend-bar-row:last-child{border-bottom:none;}
+  .trend-kw{font-size:13px;font-weight:500;width:200px;flex-shrink:0;}
+  .trend-bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;}
+  .trend-bar-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+  .trend-val{font-size:12px;font-weight:600;color:var(--accent2);width:40px;text-align:right;flex-shrink:0;}
+  .country-list-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(42,47,69,.3);}
+  .country-list-row:last-child{border-bottom:none;}
+  .loading-state{padding:40px;text-align:center;color:var(--text2);font-size:14px;}
+  .mkt-badge-high{background:rgba(0,212,170,.15);color:var(--green);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+  .mkt-badge-mid{background:rgba(108,99,255,.15);color:var(--accent);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+  .mkt-badge-low{background:rgba(255,169,64,.15);color:var(--accent4);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+  .info-banner{background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.25);border-radius:10px;padding:12px 18px;margin-bottom:20px;font-size:12px;color:var(--text2);}
+  .info-banner strong{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo"><h1>Affiliate Hub</h1><p>Multi-network dashboard</p></div>
+  <div class="nav-section">Visao Geral</div>
+  <div class="nav-item active" onclick="showSection('performance',this)">Dashboard</div>
+  <div class="nav-item" onclick="showSection('market',this)">Mercado Publico</div>
+  <div class="nav-section">Redes de Afiliados</div>
+  <div class="networks-list" id="networksList"></div>
+  <button class="add-net-btn" onclick="openModal()">+ Adicionar rede</button>
+</aside>
+
+<main class="main">
+
+  <!-- ═══════════════════════════════════ PERFORMANCE SECTION ═══════════════════════════ -->
+  <div id="sec-performance" class="section visible">
+    <div class="topbar">
+      <div><h2>Dashboard de Performance</h2><div class="subtitle">Todas as redes · Atualizado agora</div></div>
+      <div class="period-selector">
+        <button class="period-btn" onclick="setPeriod(this,7)">7D</button>
+        <button class="period-btn active" onclick="setPeriod(this,30)">30D</button>
+        <button class="period-btn" onclick="setPeriod(this,90)">90D</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="toolbar-label">Periodo:</div>
+      <input type="date" class="date-input" id="dateFrom">
+      <span class="toolbar-sep">-&gt;</span>
+      <input type="date" class="date-input" id="dateTo">
+      <button class="toolbar-btn" onclick="applyDateFilter()">Aplicar</button>
+      <span class="toolbar-sep" style="margin:0 2px">|</span>
+      <button class="toolbar-btn" onclick="exportToExcel()">Exportar Excel</button>
+      <div class="roi-control">
+        <span class="toolbar-label">Alerta ROI &lt;</span>
+        <input type="number" class="roi-input" id="roiThreshold" value="150" min="0" max="9999" onchange="checkRoiAlerts()">
+        <span class="toolbar-label">%</span>
+      </div>
+      <div class="toolbar-right">
+        <div class="auto-refresh-dot" id="refreshDot" style="display:none"></div>
+        <span class="refresh-countdown" id="refreshCountdown"></span>
+        <button class="toolbar-btn" id="autoRefreshBtn" onclick="toggleAutoRefresh()">Auto-refresh: OFF</button>
+      </div>
+    </div>
+    <div class="alert-panel" id="alertPanel">
+      <div class="alert-panel-title">Produtos abaixo do ROI minimo</div>
+      <div id="alertItems"></div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card k1"><div class="kpi-label">Comissao Total</div><div class="kpi-value" id="kpiComm">$18,432</div><div class="kpi-change up">23.4% vs mes anterior</div></div>
+      <div class="kpi-card k2"><div class="kpi-label">Conversoes</div><div class="kpi-value" id="kpiConv">1,847</div><div class="kpi-change up">17.2% vs mes anterior</div></div>
+      <div class="kpi-card k3"><div class="kpi-label">CPC Medio</div><div class="kpi-value" id="kpiCpc">$0.38</div><div class="kpi-change down">4.1% vs mes anterior</div></div>
+      <div class="kpi-card k4"><div class="kpi-label">ROI Medio</div><div class="kpi-value" id="kpiRoi">284%</div><div class="kpi-change up">31.8% vs mes anterior</div></div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Receita por Rede - Evolucao</div>
+        <div class="chart-subtitle">Comissoes diarias agregadas por plataforma</div>
+        <div style="position:relative;height:220px"><canvas id="revenueChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Distribuicao de Receita</div>
+        <div class="chart-subtitle">% por rede de afiliados</div>
+        <div style="position:relative;height:220px"><canvas id="pieChart"></canvas></div>
+      </div>
+    </div>
+    <div class="leaderboard-grid">
+      <div class="lb-card">
+        <div class="lb-header"><div class="lb-icon" style="background:rgba(108,99,255,.15)">Prod</div><div><div class="lb-title">Top Produtores</div><div class="lb-sub">Por comissao gerada para voce</div></div></div>
+        <div id="lbVendors"></div>
+      </div>
+      <div class="lb-card">
+        <div class="lb-header"><div class="lb-icon" style="background:rgba(0,212,170,.15)">Item</div><div><div class="lb-title">Produtos Mais Vendidos</div><div class="lb-sub">Por volume de conversoes</div></div></div>
+        <div id="lbProducts"></div>
+      </div>
+      <div class="lb-card">
+        <div class="lb-header"><div class="lb-icon" style="background:rgba(255,169,64,.15)">Geo</div><div><div class="lb-title">Paises Que Mais Compram</div><div class="lb-sub">Por receita gerada</div></div></div>
+        <div id="lbCountries"></div>
+      </div>
+    </div>
+    <div class="chart-card cross-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div><div class="chart-title">Cruzamento Produto x Pais</div><div class="chart-subtitle">Clique em um item para ver o detalhamento</div></div>
+        <div class="cross-tabs">
+          <button class="cross-tab active" onclick="setCrossMode('heatmap',this)">Heatmap</button>
+          <button class="cross-tab" onclick="setCrossMode('by-country',this)">Por Pais</button>
+          <button class="cross-tab" onclick="setCrossMode('by-product',this)">Por Produto</button>
+        </div>
+      </div>
+      <div id="crossContent"></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div><div class="chart-title">Produtos Mais Escalados</div><div class="chart-subtitle">Ranking completo por comissao gerada</div></div>
+        <input class="search-input" placeholder="Buscar produto..." oninput="filterTable(this.value)">
+      </div>
+      <table><thead><tr><th>#</th><th>Produto</th><th>Pais Top</th><th>CPC</th><th>Conversoes</th><th>Comissao</th><th>ROI</th><th>Status</th></tr></thead>
+      <tbody id="productsBody"></tbody></table>
+    </div>
+    <div class="bottom-grid">
+      <div class="chart-card">
+        <div class="chart-title">Comparativo de Redes</div>
+        <div class="chart-subtitle">Receita total por plataforma</div>
+        <div id="networkCompare"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top GEOs</div>
+        <div class="chart-subtitle">Paises que mais geram conversoes</div>
+        <div id="geoList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ MARKET SECTION ═══════════════════════════════ -->
+  <div id="sec-market" class="section">
+    <div class="topbar">
+      <div><h2>Mercado Publico</h2><div class="subtitle">Ofertas em alta, Clickbank gravity, tendencias Google</div></div>
+      <button class="toolbar-btn" onclick="loadMarketData()">Atualizar dados</button>
+    </div>
+
+    <div class="info-banner">
+      <strong>Dados publicos sem login</strong> &mdash; OfferVault agrega 200+ redes &middot; Clickbank gravity via CBEngine &middot; Google Trends por nicho de saude. Cache de 2h.
+    </div>
+
+    <div class="mkt-stat-grid">
+      <div class="mkt-stat"><div class="mkt-stat-label">Ofertas OfferVault</div><div class="mkt-stat-value" id="mktStatOffers">--</div><div class="mkt-stat-sub">saude &amp; bem-estar</div></div>
+      <div class="mkt-stat"><div class="mkt-stat-label">Produtos Clickbank</div><div class="mkt-stat-value" id="mktStatCB">--</div><div class="mkt-stat-sub">por gravity score</div></div>
+      <div class="mkt-stat"><div class="mkt-stat-label">Maior Gravity CB</div><div class="mkt-stat-value" id="mktStatGravity">--</div><div class="mkt-stat-sub">top produto</div></div>
+      <div class="mkt-stat"><div class="mkt-stat-label">Pais #1 Tendencia</div><div class="mkt-stat-value" id="mktStatCountry">--</div><div class="mkt-stat-sub">weight loss interest</div></div>
+    </div>
+
+    <div class="market-tabs">
+      <button class="mkt-tab active" onclick="showMktPanel('clickbank',this)">Clickbank Top Products</button>
+      <button class="mkt-tab" onclick="showMktPanel('offervault',this)">OfferVault Offers</button>
+      <button class="mkt-tab" onclick="showMktPanel('trends',this)">Google Trends</button>
+      <button class="mkt-tab" onclick="showMktPanel('countries',this)">Interesse por Pais</button>
+    </div>
+
+    <!-- Clickbank Panel -->
+    <div id="mkt-clickbank" class="mkt-panel visible">
+      <div class="table-card" style="margin-bottom:0">
+        <div class="table-header">
+          <div><div class="chart-title">Top Produtos Clickbank</div><div class="chart-subtitle">Ordenados por Gravity Score (via CBEngine)</div></div>
+          <input class="search-input" placeholder="Buscar produto..." oninput="filterMktTable('cb',this.value)">
+        </div>
+        <div id="cbLoading" class="loading-state">Carregando dados do Clickbank...</div>
+        <table id="cbTable" style="display:none">
+          <thead><tr><th>#</th><th>Produto</th><th>Gravity</th><th>Comissao Inicial</th><th>Comissao Media</th><th>Categoria</th></tr></thead>
+          <tbody id="cbBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- OfferVault Panel -->
+    <div id="mkt-offervault" class="mkt-panel">
+      <div class="table-card" style="margin-bottom:0">
+        <div class="table-header">
+          <div><div class="chart-title">Ofertas OfferVault</div><div class="chart-subtitle">200+ redes de afiliados agregadas em tempo real</div></div>
+          <input class="search-input" placeholder="Buscar oferta..." oninput="filterMktTable('ov',this.value)">
+        </div>
+        <div id="ovLoading" class="loading-state">Carregando OfferVault...</div>
+        <table id="ovTable" style="display:none">
+          <thead><tr><th>#</th><th>Oferta</th><th>Rede</th><th>Payout</th><th>GEOs</th><th>Tipo</th><th>Categoria</th></tr></thead>
+          <tbody id="ovBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Trends Panel -->
+    <div id="mkt-trends" class="mkt-panel">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Interesse ao longo do tempo</div>
+          <div class="chart-subtitle">Ultimos 3 meses - escala 0-100</div>
+          <div style="position:relative;height:220px"><canvas id="trendsChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Intensidade Atual por Nicho</div>
+          <div class="chart-subtitle">Ultimo ponto disponivel do Google Trends</div>
+          <div id="trendsBars" style="padding-top:8px"><div class="loading-state">Carregando Trends...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Countries Panel -->
+    <div id="mkt-countries" class="mkt-panel">
+      <div class="bottom-grid">
+        <div class="chart-card">
+          <div class="chart-title">Top Paises - Interesse em Weight Loss</div>
+          <div class="chart-subtitle">Indice de busca relativo (Google Trends)</div>
+          <div id="countriesList"><div class="loading-state">Carregando paises...</div></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Distribuicao por Regiao</div>
+          <div class="chart-subtitle">% de interesse global</div>
+          <div style="position:relative;height:260px"><canvas id="countriesPie"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end sec-market -->
+
+</main>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3>Adicionar Rede de Afiliados</h3>
+    <p>Insira as credenciais da API para sincronizar dados automaticamente.</p>
+    <div class="form-group"><label class="form-label">Nome da Plataforma</label><input class="form-input" placeholder="Ex: Hotmart, MaxBounty..." id="newNetName"></div>
+    <div class="form-group"><label class="form-label">API Key / Token</label><input class="form-input" type="password" placeholder="Chave de API da plataforma"></div>
+    <div class="form-group"><label class="form-label">API Secret (se necessario)</label><input class="form-input" type="password" placeholder="Secret ou Account ID"></div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="addNetwork()">Conectar Rede</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+const NETWORKS = [
+  { name:'Clickbank',     color:'#6c63ff', icon:'CB', rev:5200, roi:320, status:'active' },
+  { name:'Buygoods',      color:'#00d4aa', icon:'BG', rev:3800, roi:290, status:'active' },
+  { name:'Maxweb',        color:'#ffa940', icon:'MW', rev:2900, roi:255, status:'active' },
+  { name:'Gurumedia',     color:'#ff6b6b', icon:'GM', rev:2400, roi:280, status:'active' },
+  { name:'Fellas Ads',    color:'#a78bfa', icon:'FA', rev:1600, roi:210, status:'active' },
+  { name:'Media Scalers', color:'#34d399', icon:'MS', rev:1100, roi:190, status:'paused' },
+  { name:'Smart ADV',     color:'#60a5fa', icon:'SA', rev: 820, roi:175, status:'paused' },
+  { name:'Smashloud',     color:'#f472b6', icon:'SL', rev: 612, roi:160, status:'active' },
+];
+const DEMO_VENDORS = [
+  { name:'Dr. Michael Adams', niche:'Blood Sugar / Health', comm:9840, conv:601, net:'Clickbank', avatar:'MA', color:'#6c63ff' },
+  { name:'NutraLabs Inc.',    niche:'Weight Loss',          comm:7650, conv:488, net:'Buygoods',  avatar:'NL', color:'#00d4aa' },
+  { name:'VisionTech Corp.',  niche:'Hearing / Dental',     comm:5920, conv:330, net:'Clickbank', avatar:'VT', color:'#ffa940' },
+  { name:'Peak Performance',  niche:'Joint & Mobility',     comm:3270, conv:212, net:'Maxweb',    avatar:'PP', color:'#ff6b6b' },
+  { name:'Wellness Origins',  niche:'Sleep & Stress',       comm:2100, conv:148, net:'Gurumedia', avatar:'WO', color:'#a78bfa' },
+];
+const DEMO_PRODUCTS = [
+  { name:'GlucoTrust',        net:'Clickbank',   country:'USA',    cpc:0.42, conv:312, comm:4120, roi:348, status:'hot' },
+  { name:'ProDentim',         net:'Clickbank',   country:'USA',    cpc:0.38, conv:289, comm:3610, roi:320, status:'hot' },
+  { name:'Ikaria Lean Belly', net:'Buygoods',    country:'UK',     cpc:0.51, conv:201, comm:2870, roi:295, status:'scaling' },
+  { name:'Java Burn',         net:'Clickbank',   country:'Canada', cpc:0.44, conv:198, comm:2540, roi:271, status:'scaling' },
+  { name:'Cortexi',           net:'Buygoods',    country:'AUS',    cpc:0.35, conv:187, comm:2210, roi:310, status:'hot' },
+  { name:'SeroLean',          net:'Maxweb',      country:'USA',    cpc:0.29, conv:156, comm:1840, roi:285, status:'scaling' },
+  { name:'Puravive',          net:'Gurumedia',   country:'UK',     cpc:0.48, conv:143, comm:1720, roi:260, status:'scaling' },
+  { name:'Ageless Knees',     net:'Fellas Ads',  country:'USA',    cpc:0.33, conv:120, comm:1340, roi:240, status:'stable' },
+  { name:'Fast Lean Pro',     net:'Maxweb',      country:'NZ',     cpc:0.27, conv:112, comm:1180, roi:218, status:'stable' },
+  { name:'Kerassentials',     net:'Smashloud',   country:'USA',    cpc:0.31, conv: 98, comm: 940, roi:195, status:'stable' },
+];
+const GEOS = [
+  { flag:'US', name:'United States',  pct:100, val:'$8,240' },
+  { flag:'GB', name:'United Kingdom', pct: 72, val:'$5,920' },
+  { flag:'CA', name:'Canada',         pct: 58, val:'$4,770' },
+  { flag:'AU', name:'Australia',      pct: 49, val:'$4,030' },
+  { flag:'NZ', name:'New Zealand',    pct: 24, val:'$1,980' },
+  { flag:'IE', name:'Ireland',        pct: 18, val:'$1,480' },
+  { flag:'ZA', name:'South Africa',   pct: 12, val:  '$990' },
+];
+const CROSS_DATA = [
+  { product:'GlucoTrust',       country:'USA',       conv:198, comm:2610, cpc:0.44 },
+  { product:'GlucoTrust',       country:'UK',        conv: 68, comm: 900, cpc:0.51 },
+  { product:'GlucoTrust',       country:'Canada',    conv: 32, comm: 420, cpc:0.48 },
+  { product:'GlucoTrust',       country:'Australia', conv: 14, comm: 190, cpc:0.55 },
+  { product:'ProDentim',        country:'USA',       conv:155, comm:1940, cpc:0.39 },
+  { product:'ProDentim',        country:'UK',        conv: 82, comm:1020, cpc:0.42 },
+  { product:'ProDentim',        country:'Australia', conv: 38, comm: 470, cpc:0.46 },
+  { product:'ProDentim',        country:'Canada',    conv: 14, comm: 180, cpc:0.40 },
+  { product:'Ikaria Lean Belly',country:'UK',        conv:110, comm:1570, cpc:0.53 },
+  { product:'Ikaria Lean Belly',country:'USA',       conv: 62, comm: 885, cpc:0.50 },
+  { product:'Ikaria Lean Belly',country:'Australia', conv: 19, comm: 270, cpc:0.56 },
+  { product:'Java Burn',        country:'Canada',    conv:120, comm:1540, cpc:0.44 },
+  { product:'Java Burn',        country:'USA',       conv: 55, comm: 706, cpc:0.46 },
+  { product:'Cortexi',          country:'Australia', conv:112, comm:1320, cpc:0.36 },
+  { product:'Cortexi',          country:'USA',       conv: 55, comm: 650, cpc:0.34 },
+  { product:'SeroLean',         country:'USA',       conv: 98, comm:1155, cpc:0.30 },
+  { product:'SeroLean',         country:'Canada',    conv: 38, comm: 448, cpc:0.28 },
+  { product:'Puravive',         country:'UK',        conv: 85, comm:1020, cpc:0.49 },
+  { product:'Puravive',         country:'USA',       conv: 40, comm: 480, cpc:0.47 },
+];
+const CROSS_PRODUCTS  = [...new Set(CROSS_DATA.map(d=>d.product))];
+const CROSS_COUNTRIES = [...new Set(CROSS_DATA.map(d=>d.country))];
+
+let currentProducts = DEMO_PRODUCTS;
+let mktCBData = [], mktOVData = [];
+let trendsChartObj = null, countriesPieObj = null;
+
+// ── NAVIGATION ───────────────────────────────────────────────
+function showSection(id, el) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('visible'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('visible');
+  el.classList.add('active');
+  if (id === 'market') loadMarketData();
+}
+
+// ── MARKET PANELS ────────────────────────────────────────────
+function showMktPanel(id, btn) {
+  document.querySelectorAll('.mkt-panel').forEach(p=>p.classList.remove('visible'));
+  document.querySelectorAll('.mkt-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mkt-'+id).classList.add('visible');
+  btn.classList.add('active');
+}
+
+const API_BASE = 'https://web-production-07822.up.railway.app';
+
+async function loadMarketData() {
+  // Load all market data in parallel
+  Promise.allSettled([
+    loadCBData(),
+    loadOVData(),
+    loadTrendsData(),
+    loadCountriesData(),
+  ]);
+}
+
+async function loadCBData() {
+  try {
+    document.getElementById('cbLoading').style.display='block';
+    document.getElementById('cbTable').style.display='none';
+    const res = await fetch(`${API_BASE}/api/market/clickbank?category=health&limit=30`, {signal: AbortSignal.timeout(15000)});
+    const data = await res.json();
+    mktCBData = data.products || [];
+    document.getElementById('mktStatCB').textContent = mktCBData.length;
+    const top = mktCBData[0];
+    if (top) document.getElementById('mktStatGravity').textContent = top.gravity.toFixed(1);
+    renderCBTable(mktCBData);
+  } catch(e) {
+    document.getElementById('cbLoading').textContent = 'Backend offline ou sem dados. Rode: node server.js';
+  }
+}
+
+function renderCBTable(data) {
+  document.getElementById('cbLoading').style.display='none';
+  document.getElementById('cbTable').style.display='table';
+  const maxG = Math.max(...data.map(p=>p.gravity), 1);
+  document.getElementById('cbBody').innerHTML = data.map((p,i) => {
+    const gPct = Math.round((p.gravity/maxG)*100);
+    const badge = p.gravity > 200 ? '<span class="mkt-badge-high">HOT</span>'
+      : p.gravity > 80 ? '<span class="mkt-badge-mid">BOM</span>'
+      : '<span class="mkt-badge-low">NOVO</span>';
+    return `<tr>
+      <td class="rank">${i+1}</td>
+      <td><div class="product-name">${p.name}</div><div class="product-net">Vendor: ${p.vendor||'N/A'}</div></td>
+      <td><div class="bar-wrap"><div class="mini-bar" style="width:${gPct}px;background:var(--accent2)"></div><strong>${p.gravity.toFixed(1)}</strong> ${badge}</div></td>
+      <td>${p.initComm||'N/A'}</td>
+      <td>${p.avgComm||'N/A'}</td>
+      <td><span class="tag tag-purple">${p.category||'health'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterMktTable(type, q) {
+  const lower = q.toLowerCase();
+  if (type === 'cb') {
+    const f = mktCBData.filter(p=>p.name.toLowerCase().includes(lower)||(p.vendor||'').toLowerCase().includes(lower));
+    renderCBTable(f.length?f:mktCBData);
+  } else {
+    const f = mktOVData.filter(o=>o.name.toLowerCase().includes(lower)||(o.network||'').toLowerCase().includes(lower));
+    renderOVTable(f.length?f:mktOVData);
+  }
+}
+
+async function loadOVData() {
+  try {
+    document.getElementById('ovLoading').style.display='block';
+    document.getElementById('ovTable').style.display='none';
+    const res = await fetch(`${API_BASE}/api/market/offers?keyword=health&pages=2`, {signal: AbortSignal.timeout(20000)});
+    const data = await res.json();
+    mktOVData = data.offers || [];
+    document.getElementById('mktStatOffers').textContent = mktOVData.length;
+    renderOVTable(mktOVData);
+  } catch(e) {
+    document.getElementById('ovLoading').textContent = 'Backend offline ou sem dados.';
+  }
+}
+
+function renderOVTable(data) {
+  document.getElementById('ovLoading').style.display='none';
+  document.getElementById('ovTable').style.display='table';
+  document.getElementById('ovBody').innerHTML = data.slice(0,50).map((o,i) => `
+    <tr>
+      <td class="rank">${i+1}</td>
+      <td><div class="product-name">${o.name}</div></td>
+      <td><span class="tag tag-purple">${o.network||'N/A'}</span></td>
+      <td style="color:var(--green);font-weight:600">${o.payout||'N/A'}</td>
+      <td style="font-size:11px;color:var(--text2)">${(o.geos||'N/A').split(',').slice(0,5).join(', ')}</td>
+      <td><span class="tag tag-orange">${o.type||'CPS'}</span></td>
+      <td style="font-size:11px;color:var(--text2)">${o.category||''}</td>
+    </tr>`).join('');
+}
+
+async function loadTrendsData() {
+  try {
+    const res = await fetch(`${API_BASE}/api/market/trends?keywords=weight+loss,blood+sugar,joint+pain`, {signal: AbortSignal.timeout(15000)});
+    const data = await res.json();
+    if (data.error) { document.getElementById('trendsBars').innerHTML = '<div class="loading-state">Trends indisponivel: '+data.error+'</div>'; return; }
+    renderTrends(data);
+  } catch(e) {
+    document.getElementById('trendsBars').innerHTML = '<div class="loading-state">Backend offline.</div>';
+  }
+}
+
+function renderTrends(data) {
+  const kws = data.keywords || [];
+  const timeline = data.timeline || [];
+  if (!timeline.length) { document.getElementById('trendsBars').innerHTML='<div class="loading-state">Sem dados de trends.</div>'; return; }
+
+  // Build chart
+  const labels = timeline.map(p=>p.date);
+  const colors = ['#6c63ff','#00d4aa','#ffa940','#ff6b6b','#a78bfa'];
+  const datasets = kws.map((kw,i)=>({
+    label: kw,
+    data: timeline.map(p=>p.values[i]?.value||0),
+    borderColor: colors[i%colors.length],
+    backgroundColor: colors[i%colors.length]+'18',
+    fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2,
+  }));
+
+  if (trendsChartObj) trendsChartObj.destroy();
+  const ctx = document.getElementById('trendsChart').getContext('2d');
+  trendsChartObj = new Chart(ctx, {
+    type:'line', data:{labels, datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8892b0',font:{size:11},boxWidth:12}}},
+      scales:{
+        x:{ticks:{color:'#8892b0',maxTicksLimit:8,font:{size:10}},grid:{color:'#2a2f4530'}},
+        y:{min:0,max:100,ticks:{color:'#8892b0',font:{size:10}},grid:{color:'#2a2f4530'}},
+      }
+    }
+  });
+
+  // Latest values bars
+  const last = timeline[timeline.length-1];
+  document.getElementById('trendsBars').innerHTML = kws.map((kw,i) => {
+    const val = last.values[i]?.value || 0;
+    return `<div class="trend-bar-row">
+      <div class="trend-kw">${kw}</div>
+      <div class="trend-bar-track"><div class="trend-bar-fill" style="width:${val}%;background:${colors[i%colors.length]}"></div></div>
+      <div class="trend-val">${val}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadCountriesData() {
+  try {
+    const res = await fetch(`${API_BASE}/api/market/countries?keyword=weight+loss+supplement`, {signal: AbortSignal.timeout(15000)});
+    const data = await res.json();
+    if (!data.countries?.length) { document.getElementById('countriesList').innerHTML='<div class="loading-state">Sem dados de paises.</div>'; return; }
+    document.getElementById('mktStatCountry').textContent = data.countries[0]?.code || '--';
+    renderCountries(data.countries);
+  } catch(e) {
+    document.getElementById('countriesList').innerHTML='<div class="loading-state">Backend offline.</div>';
+  }
+}
+
+function renderCountries(countries) {
+  const maxV = countries[0]?.value || 1;
+  const colors = ['#6c63ff','#00d4aa','#ffa940','#ff6b6b','#a78bfa','#34d399','#60a5fa','#f472b6','#fb923c','#4ade80'];
+
+  document.getElementById('countriesList').innerHTML = countries.slice(0,15).map((c,i) => {
+    const pct = Math.round((c.value/maxV)*100);
+    return `<div class="country-list-row">
+      <div style="width:28px;font-size:13px;font-weight:700;color:${colors[i%colors.length]}">${i+1}</div>
+      <div style="font-size:13px;font-weight:500;flex:1">${c.country} <span style="font-size:10px;color:var(--text2)">(${c.code})</span></div>
+      <div class="geo-bar-wrap" style="width:120px"><div class="geo-bar" style="width:${pct}%;background:${colors[i%colors.length]}"></div></div>
+      <div style="font-size:12px;font-weight:600;color:${colors[i%colors.length]};width:36px;text-align:right">${c.value}</div>
+    </div>`;
+  }).join('');
+
+  // Pie chart
+  const top8 = countries.slice(0,8);
+  if (countriesPieObj) countriesPieObj.destroy();
+  const ctx = document.getElementById('countriesPie').getContext('2d');
+  countriesPieObj = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels: top8.map(c=>c.code||c.country),
+      datasets:[{data:top8.map(c=>c.value), backgroundColor:colors.slice(0,8), borderWidth:2, borderColor:'#161a27'}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{color:'#8892b0',font:{size:11},boxWidth:12,padding:8}}}}
+  });
+}
+
+// ── PERFORMANCE SECTION FUNCTIONS ────────────────────────────
+function posClass(i){return i===0?'lb-pos-1':i===1?'lb-pos-2':i===2?'lb-pos-3':'lb-pos-n';}
+
+function renderLeaderboards(vendors,products,geos){
+  const maxComm=Math.max(...(vendors||DEMO_VENDORS).map(v=>v.comm));
+  document.getElementById('lbVendors').innerHTML=(vendors||DEMO_VENDORS).map((v,i)=>`
+    <div class="lb-row">
+      <div class="lb-pos ${posClass(i)}">${i+1}</div>
+      <div class="lb-avatar" style="background:${v.color}22;color:${v.color}">${v.avatar}</div>
+      <div class="lb-info">
+        <div class="lb-name">${v.name}</div>
+        <div class="lb-detail">${v.niche} - ${v.net}</div>
+        <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((v.comm/maxComm)*100)}%;background:${v.color}"></div></div>
+      </div>
+      <div class="lb-value">$${v.comm.toLocaleString()}<span class="lb-change">${v.conv} conv.</span></div>
+    </div>`).join('');
+  const prods=[...(products||DEMO_PRODUCTS)].sort((a,b)=>b.conv-a.conv).slice(0,5);
+  const maxConv=Math.max(...prods.map(p=>p.conv));
+  document.getElementById('lbProducts').innerHTML=prods.map((p,i)=>`
+    <div class="lb-row">
+      <div class="lb-pos ${posClass(i)}">${i+1}</div>
+      <div class="lb-info">
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-detail">${p.net} - CPC $${Number(p.cpc).toFixed(2)}</div>
+        <div class="lb-bar-bg"><div class="lb-bar" style="width:${Math.round((p.conv/maxConv)*100)}%"></div></div>
+      </div>
+      <div class="lb-value">${Number(p.conv).toLocaleString()}<span class="lb-change">$${Number(p.comm).toLocaleString()}</span></div>
+    </div>`).join('');
+  const geoData=geos||GEOS;
+  const maxVal=geoData[0].pct;
+  document.getElementById('lbCountries').innerHTML=geoData.slice(0,5).map((g,i)=>`
+    <div class="lb-row">
+      <div class="lb-pos ${posClass(i)}">${i+1}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);flex-shrink:0;width:24px">${g.flag}</div>
+      <div class="lb-info">
+        <div class="lb-name">${g.name}</div>
+        <div class="lb-bar-bg"><div class="lb-bar" style="width:${g.pct}%;background:var(--accent2)"></div></div>
+      </div>
+      <div class="lb-value" style="color:var(--accent2)">${g.val}</div>
+    </div>`).join('');
+}
+
+function renderNetworks(){
+  document.getElementById('networksList').innerHTML=NETWORKS.map((n,i)=>`
+    <div class="network-item ${i===0?'active-net':''}" onclick="selectNetwork(this)">
+      <div class="net-left">
+        <div class="net-icon" style="background:${n.color}22;color:${n.color}">${n.icon}</div>
+        <div class="net-name">${n.name}</div>
+      </div>
+      <span class="net-badge ${n.status==='active'?'badge-green':'badge-orange'}">${n.status==='active'?'ON':'OFF'}</span>
+    </div>`).join('');
+}
+function selectNetwork(el){document.querySelectorAll('.network-item').forEach(e=>e.classList.remove('active-net'));el.classList.add('active-net');}
+
+function renderProducts(data){
+  currentProducts=data;
+  const maxC=Math.max(...data.map(p=>p.comm));
+  document.getElementById('productsBody').innerHTML=data.map((p,i)=>{
+    const bw=Math.round((p.comm/maxC)*80);
+    const tag=p.status==='hot'?'<span class="tag tag-green">Hot</span>':p.status==='scaling'?'<span class="tag tag-purple">Scaling</span>':'<span class="tag tag-orange">Stable</span>';
+    return `<tr><td class="rank">${i+1}</td><td><div class="product-name">${p.name}</div><div class="product-net">${p.net}</div></td>
+      <td>${p.country}</td><td>$${Number(p.cpc).toFixed(2)}</td>
+      <td>${Number(p.conv).toLocaleString()}</td>
+      <td><div class="bar-wrap"><div class="mini-bar" style="width:${bw}px"></div><span>$${Number(p.comm).toLocaleString()}</span></div></td>
+      <td style="color:var(--green);font-weight:600">${p.roi}%</td><td>${tag}</td></tr>`;
+  }).join('');
+}
+function filterTable(q){const f=DEMO_PRODUCTS.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.net.toLowerCase().includes(q.toLowerCase()));renderProducts(f.length?f:DEMO_PRODUCTS);}
+
+function renderNetworkCompare(nets){
+  const arr=nets||NETWORKS;const maxV=Math.max(...arr.map(n=>n.rev||0));
+  document.getElementById('networkCompare').innerHTML=arr.map(n=>{
+    const pct=maxV>0?Math.round(((n.rev||0)/maxV)*100):0;
+    return `<div class="net-row"><div class="net-row-name">${n.name}</div>
+      <div class="net-bar-track"><div class="net-bar-fill" style="width:${pct}%;background:${n.color}"></div></div>
+      <div class="net-row-val" style="color:${n.color}">$${Number(n.rev||0).toLocaleString()}</div></div>`;
+  }).join('');
+}
+function renderGeos(){
+  document.getElementById('geoList').innerHTML=GEOS.map(g=>`
+    <div class="geo-row">
+      <div class="geo-flag" style="font-size:13px;font-weight:700;color:var(--text2)">${g.flag}</div>
+      <div class="geo-name">${g.name}</div>
+      <div class="geo-bar-wrap"><div class="geo-bar" style="width:${g.pct}%"></div></div>
+      <div class="geo-val">${g.val}</div>
+    </div>`).join('');
+}
+
+function buildLineChart(){
+  const days=Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-29+i);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});});
+  const seed=s=>{let x=s;return()=>{x=(x*16807)%2147483647;return(x-1)/2147483646;};};
+  const datasets=NETWORKS.slice(0,5).map((n,i)=>{
+    const rng=seed(i*999+42);let v=80+i*20;
+    return{label:n.name,data:days.map(()=>{v+=(rng()-.45)*30;return Math.max(10,Math.round(v));}),
+      borderColor:n.color,backgroundColor:n.color+'18',fill:true,tension:0.4,pointRadius:0,borderWidth:2};
+  });
+  new Chart(document.getElementById('revenueChart').getContext('2d'),{type:'line',data:{labels:days,datasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8892b0',font:{size:11},boxWidth:12}}},
+      scales:{x:{ticks:{color:'#8892b0',maxTicksLimit:8,font:{size:10}},grid:{color:'#2a2f4530'}},
+              y:{ticks:{color:'#8892b0',font:{size:10},callback:v=>'$'+v},grid:{color:'#2a2f4530'}}}}});
+}
+function buildPieChart(){
+  new Chart(document.getElementById('pieChart').getContext('2d'),{type:'doughnut',
+    data:{labels:NETWORKS.map(n=>n.name),datasets:[{data:NETWORKS.map(n=>n.rev),backgroundColor:NETWORKS.map(n=>n.color),borderWidth:2,borderColor:'#161a27'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8892b0',font:{size:11},boxWidth:12,padding:8}}}}});
+}
+
+// ── Cross Analysis ────────────────────────────────────────────
+function heatColor(ratio){
+  if(ratio<=0)return{bg:'rgba(42,47,69,.4)',text:'#4a5568'};
+  const stops=[[0,[30,60,60]],[0.25,[0,140,100]],[0.6,[0,200,130]],[0.85,[255,180,30]],[1,[255,107,50]]];
+  let lo=stops[0],hi=stops[stops.length-1];
+  for(let i=0;i<stops.length-1;i++){if(ratio>=stops[i][0]&&ratio<=stops[i+1][0]){lo=stops[i];hi=stops[i+1];break;}}
+  const t=lo[0]===hi[0]?1:(ratio-lo[0])/(hi[0]-lo[0]);
+  const r=Math.round(lo[1][0]+(hi[1][0]-lo[1][0])*t);
+  const g=Math.round(lo[1][1]+(hi[1][1]-lo[1][1])*t);
+  const b=Math.round(lo[1][2]+(hi[1][2]-lo[1][2])*t);
+  return{bg:`rgba(${r},${g},${b},.22)`,text:`rgb(${r},${g},${b})`};
+}
+let crossMode='heatmap',crossSelected=null;
+function setCrossMode(mode,btn){crossMode=mode;crossSelected=null;document.querySelectorAll('.cross-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCross();}
+function renderCross(){const el=document.getElementById('crossContent');if(crossMode==='heatmap')renderHeatmap(el);else if(crossMode==='by-country')renderByCountry(el);else renderByProduct(el);}
+
+function renderHeatmap(el){
+  const maxConv=Math.max(...CROSS_DATA.map(d=>d.conv));
+  const lookup={};CROSS_DATA.forEach(d=>{lookup[`${d.product}||${d.country}`]=d;});
+  let html=`<div class="heatmap-wrap"><table class="heatmap-table"><thead><tr><th>Produto</th>${CROSS_COUNTRIES.map(c=>`<th class="country-header">${c}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>`;
+  CROSS_PRODUCTS.forEach(p=>{
+    const rowData=CROSS_COUNTRIES.map(c=>lookup[`${p}||${c}`]||null);
+    const rowTotal=rowData.reduce((s,d)=>s+(d?d.conv:0),0);
+    html+=`<tr><td><div class="hm-product-cell">${p}</div></td>${rowData.map(d=>{
+      if(!d)return`<td><div class="hm-cell" style="background:rgba(42,47,69,.3)"><span style="font-size:11px;color:#3a4060">-</span></div></td>`;
+      const col=heatColor(d.conv/maxConv);
+      return`<td><div class="hm-cell" style="background:${col.bg}" title="${p} - ${d.country}: ${d.conv} conv" onclick="drillDown('${p}','${d.country}')"><span class="hm-conv" style="color:${col.text}">${d.conv}</span><span class="hm-comm" style="color:${col.text}">$${d.comm}</span></div></td>`;
+    }).join('')}<td style="text-align:right;font-weight:700;font-size:13px;color:var(--green)">${rowTotal}</td></tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  el.innerHTML=html;
+}
+function renderByCountry(el){
+  const totals={};CROSS_DATA.forEach(d=>{if(!totals[d.country])totals[d.country]={conv:0,comm:0};totals[d.country].conv+=d.conv;totals[d.country].comm+=d.comm;});
+  const sorted=Object.entries(totals).sort((a,b)=>b[1].comm-a[1].comm);
+  const sel=crossSelected||sorted[0][0];
+  const detailData=CROSS_DATA.filter(d=>d.country===sel).sort((a,b)=>b.conv-a.conv);
+  const maxConv=Math.max(...detailData.map(d=>d.conv));
+  const colors=['#6c63ff','#00d4aa','#ffa940','#ff6b6b','#a78bfa'];
+  el.innerHTML=`<div class="cross-inner"><div class="cross-list">${sorted.map(([country,t])=>`<div class="cross-list-item ${country===sel?'selected':''}" onclick="selectCross('${country}','by-country')"><div class="cross-list-icon">${country.slice(0,2)}</div><div class="cross-list-label">${country}</div><div class="cross-list-val">${t.conv}</div></div>`).join('')}</div><div class="cross-detail"><div class="cross-detail-title">Top produtos em <span>${sel}</span></div>${detailData.map((d,i)=>`<div class="cross-bar-row"><div class="cross-bar-rank">${i+1}</div><div class="cross-bar-name">${d.product}</div><div class="cross-bar-track"><div class="cross-bar-fill" style="width:${Math.round((d.conv/maxConv)*100)}%;background:${colors[i%colors.length]}"></div></div><div class="cross-bar-val">${d.conv}<span class="cross-bar-sub">$${d.comm}</span></div></div>`).join('')}</div></div>`;
+}
+function renderByProduct(el){
+  const totals={};CROSS_DATA.forEach(d=>{if(!totals[d.product])totals[d.product]={conv:0,comm:0};totals[d.product].conv+=d.conv;totals[d.product].comm+=d.comm;});
+  const sorted=Object.entries(totals).sort((a,b)=>b[1].conv-a[1].conv);
+  const sel=crossSelected||sorted[0][0];
+  const detailData=CROSS_DATA.filter(d=>d.product===sel).sort((a,b)=>b.conv-a.conv);
+  const maxConv=Math.max(...detailData.map(d=>d.conv));
+  const colors=['#6c63ff','#00d4aa','#ffa940','#ff6b6b','#a78bfa'];
+  el.innerHTML=`<div class="cross-inner"><div class="cross-list">${sorted.map(([prod,t])=>`<div class="cross-list-item ${prod===sel?'selected':''}" onclick="selectCross('${prod}','by-product')"><div class="cross-list-icon">P</div><div class="cross-list-label">${prod}</div><div class="cross-list-val">${t.conv}</div></div>`).join('')}</div><div class="cross-detail"><div class="cross-detail-title">Top paises para <span>${sel}</span></div>${detailData.map((d,i)=>`<div class="cross-bar-row"><div class="cross-bar-rank">${i+1}</div><div class="cross-bar-name">${d.country}</div><div class="cross-bar-track"><div class="cross-bar-fill" style="width:${Math.round((d.conv/maxConv)*100)}%;background:${colors[i%colors.length]}"></div></div><div class="cross-bar-val">${d.conv}<span class="cross-bar-sub">$${d.comm}</span></div></div>`).join('')}</div></div>`;
+}
+function selectCross(item,mode){crossSelected=item;if(mode==='by-country')renderByCountry(document.getElementById('crossContent'));else renderByProduct(document.getElementById('crossContent'));}
+function drillDown(product,country){crossMode='by-product';crossSelected=product;document.querySelectorAll('.cross-tab').forEach((b,i)=>b.classList.toggle('active',i===2));renderCross();}
+
+// ── Date / Export / ROI / Refresh ────────────────────────────
+function initDatePicker(){const today=new Date();const d30=new Date();d30.setDate(today.getDate()-30);const fmt=d=>d.toISOString().split('T')[0];document.getElementById('dateFrom').value=fmt(d30);document.getElementById('dateTo').value=fmt(today);}
+function applyDateFilter(){const from=document.getElementById('dateFrom').value;const to=document.getElementById('dateTo').value;if(!from||!to)return;const diffDays=Math.ceil((new Date(to)-new Date(from))/86400000);document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));loadFromBackend(diffDays,from,to);}
+function exportToExcel(){
+  const wb=XLSX.utils.book_new();
+  const headers=['#','Produto','Rede','Pais Top','CPC ($)','Conversoes','Comissao ($)','ROI (%)','Status'];
+  const rows=currentProducts.map((p,i)=>[i+1,p.name,p.net,p.country,Number(p.cpc).toFixed(2),p.conv,p.comm,p.roi,p.status]);
+  const ws1=XLSX.utils.aoa_to_sheet([headers,...rows]);ws1['!cols']=[4,20,14,12,8,10,12,8,10].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws1,'Produtos');
+  const netHeaders=['Rede','Receita ($)','ROI (%)','Status'];
+  const netRows=NETWORKS.map(n=>[n.name,n.rev,n.roi,n.status==='active'?'Ativa':'Pausada']);
+  const ws2=XLSX.utils.aoa_to_sheet([netHeaders,...netRows]);XLSX.utils.book_append_sheet(wb,ws2,'Redes');
+  const today=new Date().toISOString().split('T')[0];XLSX.writeFile(wb,`affiliate-hub-${today}.xlsx`);
+}
+function checkRoiAlerts(){
+  const threshold=parseInt(document.getElementById('roiThreshold').value)||150;
+  const alerts=currentProducts.filter(p=>p.roi>0&&p.roi<threshold);
+  document.querySelectorAll('#productsBody tr').forEach((tr,i)=>{const p=currentProducts[i];if(p&&p.roi>0&&p.roi<threshold){tr.classList.add('roi-alert-row');const c=tr.querySelector('td:nth-child(7)');if(c)c.classList.add('roi-alert');}else{tr.classList.remove('roi-alert-row');const c=tr.querySelector('td:nth-child(7)');if(c)c.classList.remove('roi-alert');}});
+  const panel=document.getElementById('alertPanel');const items=document.getElementById('alertItems');
+  if(alerts.length>0){panel.classList.add('visible');items.innerHTML=alerts.map(p=>`<div class="alert-item">Alerta: <strong>${p.name}</strong> (${p.net}) ROI atual: <strong style="color:var(--red)">${p.roi}%</strong> abaixo de ${threshold}%</div>`).join('');}else panel.classList.remove('visible');
+}
+let autoRefreshInterval=null,autoRefreshSeconds=0,autoRefreshTimer=null;
+const REFRESH_EVERY=5*60;
+function toggleAutoRefresh(){
+  const btn=document.getElementById('autoRefreshBtn');const dot=document.getElementById('refreshDot');const countdown=document.getElementById('refreshCountdown');
+  if(autoRefreshInterval){clearInterval(autoRefreshInterval);clearInterval(autoRefreshTimer);autoRefreshInterval=null;btn.textContent='Auto-refresh: OFF';btn.classList.remove('active');dot.style.display='none';countdown.textContent='';}
+  else{btn.textContent='Auto-refresh: ON (5min)';btn.classList.add('active');dot.style.display='block';autoRefreshSeconds=REFRESH_EVERY;updateCountdown();autoRefreshTimer=setInterval(()=>{autoRefreshSeconds--;updateCountdown();if(autoRefreshSeconds<=0)autoRefreshSeconds=REFRESH_EVERY;},1000);autoRefreshInterval=setInterval(()=>{autoRefreshSeconds=REFRESH_EVERY;loadFromBackend(30);},REFRESH_EVERY*1000);}
+}
+function updateCountdown(){const el=document.getElementById('refreshCountdown');const m=Math.floor(autoRefreshSeconds/60);const s=autoRefreshSeconds%60;el.textContent=`proximo em ${m}:${String(s).padStart(2,'0')}`;}
+function setPeriod(btn,days){document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadFromBackend(days);}
+
+// ── Backend integration ───────────────────────────────────────
+async function loadFromBackend(days=30,fromDate=null,toDate=null){
+  try{
+    const statusRes=await fetch(`${API_BASE}/api/status`,{signal:AbortSignal.timeout(2000)});
+    const status=await statusRes.json();
+    let url=`${API_BASE}/api/all?days=${days}`;
+    if(fromDate)url+=`&from=${fromDate}`;if(toDate)url+=`&to=${toDate}`;
+    const all=await(await fetch(url)).json();
+    showBanner('ok',status.networks,all.summary);
+    if(all.summary){document.getElementById('kpiComm').textContent='$'+Number(all.summary.totalCommission).toLocaleString('en-US',{maximumFractionDigits:0});document.getElementById('kpiConv').textContent=Number(all.summary.totalConversions).toLocaleString();}
+    if(status.networks){NETWORKS.forEach(n=>{const k=n.name.toLowerCase().replace(/ /g,'_');if(status.networks[k]!==undefined)n.status=status.networks[k]?'active':'paused';});renderNetworks();}
+    if(all.topProducts?.length){renderAndCheck(all.topProducts.map(p=>({name:p.name,net:p.network,country:'Global',cpc:0,conv:p.conversions,comm:p.commission,roi:0,status:p.commission>2000?'hot':p.commission>500?'scaling':'stable'})));}
+    if(all.networks){const real=all.networks.filter(n=>n.status==='ok'&&n.data).map(n=>({name:n.source,color:NETWORKS.find(x=>x.name.toLowerCase()===n.source.toLowerCase())?.color||'#6c63ff',rev:parseFloat(n.data.totalCommission)||0}));if(real.length)renderNetworkCompare(real);}
+  }catch{showBanner('demo');}
+}
+function showBanner(type,networks,summary){
+  const el=document.getElementById('connBanner');if(el)el.remove();
+  const b=document.createElement('div');b.id='connBanner';
+  if(type==='ok'){const ok=Object.values(networks).filter(Boolean).length,tot=Object.keys(networks).length;b.style.cssText='background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#00d4aa;display:flex;align-items:center;gap:8px';b.innerHTML=`OK <strong>Backend conectado</strong> - ${ok}/${tot} redes configuradas - ${summary?.networksError||0} com erro`;}
+  else{b.style.cssText='background:rgba(255,169,64,.1);border:1px solid rgba(255,169,64,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#ffa940;display:flex;align-items:center;gap:8px';b.innerHTML='Modo demo - Backend nao encontrado. Abra o terminal na pasta affiliate-backend e rode: node server.js';}
+  document.querySelector('.topbar').after(b);
+}
+const _origRenderProducts=renderProducts;
+function renderAndCheck(data){_origRenderProducts(data);setTimeout(checkRoiAlerts,50);}
+function openModal(){document.getElementById('modalBg').classList.add('open');}
+function closeModal(){document.getElementById('modalBg').classList.remove('open');}
+function addNetwork(){const name=document.getElementById('newNetName').value.trim();if(!name)return;const cols=['#e879f9','#38bdf8','#4ade80','#fb7185'];NETWORKS.push({name,color:cols[NETWORKS.length%cols.length],icon:name.slice(0,2).toUpperCase(),rev:0,roi:0,status:'active'});renderNetworks();renderNetworkCompare();closeModal();}
+
+// ── INIT ─────────────────────────────────────────────────────
+initDatePicker();
+renderNetworks();
+renderLeaderboards();
+renderCross();
+renderAndCheck(DEMO_PRODUCTS);
+renderNetworkCompare();
+renderGeos();
+buildLineChart();
+buildPieChart();
+loadFromBackend(30);
+</s
